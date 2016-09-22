@@ -1,0 +1,28 @@
+{
+  "html": {
+    "brace_style": "collapse",
+    "indent_char": " ",
+    "indent_scripts": "normal",
+    "indent_size": 2,
+    "max_preserve_newlines": 2,
+    "preserve_newlines": true,
+    "unformatted": ["a", "sub", "sup", "b", "i", "u"],
+    "wrap_line_length": 0
+  },
+  "css": {
+    "indent_char": " ",
+    "indent_size": 2
+  },
+  "js": {
+    "indent_size": 2,
+    "indent_char": " ",
+    "indent_level": 0,
+    "indent_with_tabs": false,
+    "preserve_newlines": true,
+    "max_preserve_newlines": 2,
+    /* https://github.com/Glavin001/atom-beautify/issues/439 */
+    "jslint_happy": false,
+    "space_after_anon_function": false,
+    "space_before_conditional": true
+  }
+}
