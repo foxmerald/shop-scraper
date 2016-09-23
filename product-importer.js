@@ -1,3 +1,5 @@
+"use strict";
+
 const requestPromise = require("request-promise");
 const deferred = require("deferred");
 

@@ -1,0 +1,11 @@
+{
+  "name": "zuper-preise-scraper",
+  "version": "0.0.0",
+  "dependencies": {
+    "bluebird": "^3.4.6",
+    "deferred": "^0.7.5",
+    "request": "^2.75.0",
+    "request-promise": "^4.1.1",
+    "util": "^0.10.3"
+  }
+}
