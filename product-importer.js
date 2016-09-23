@@ -114,7 +114,8 @@ var categories = [{
   name: "milchprodukte"
 }, {
   identifier: "category-2",
-  name: "bananenprodukte"
+  name: "bananenprodukte",
+  subcategoryIdentifiers: ["category-3"]
 }];
 
 var categoriesPromise = CategoryBridge.saveCategories(shopKey, categories);
