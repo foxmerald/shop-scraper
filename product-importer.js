@@ -18,14 +18,20 @@ const ServerBridge = (function() {
       }
     };
 
-    var promise = requestPromise(requestOptions);
-    promise.then(function(job) {
-      future.resolve(job);
-    }).catch(function() {
+    function retryPolling() {
       setTimeout(function() {
         pollJob(jobUrl, jobKey, future);
       }, 500);
-    });
+    }
+
+    var promise = requestPromise(requestOptions);
+    promise.then(function(job) {
+      if (job.closedTimestamp > 0) {
+        future.resolve(job);
+      } else {
+        retryPolling();
+      }
+    }).catch(retryPolling);
 
     return future.promise;
   }
@@ -50,14 +56,17 @@ const ServerBridge = (function() {
 })();
 
 var CategoryBridge = (function() {
-  function saveCategories(categories) {
+  function saveCategories(shopKey, categories) {
     let requestUrl = serverUrl + "/categories"
 
     let requestOptions = {
       method: "POST",
       uri: requestUrl,
       body: categories,
-      json: true
+      json: true,
+      qs: {
+        shopKey: shopKey
+      }
     };
 
     let jobUrl = requestUrl + "/job";
@@ -73,14 +82,17 @@ var CategoryBridge = (function() {
 })();
 
 var ProductBridge = (function() {
-  function saveProducts(products) {
+  function saveProducts(shopKey, products) {
     let requestUrl = serverUrl + "/products"
 
     let requestOptions = {
       method: "POST",
       uri: requestUrl,
       body: products,
-      json: true
+      json: true,
+      qs: {
+        shopKey: shopKey
+      }
     };
 
     let jobUrl = requestUrl + "/job";
@@ -95,37 +107,39 @@ var ProductBridge = (function() {
   return bridge;
 })();
 
+var shopKey = 1;
+
 var categories = [{
   identifier: "category-3",
-  shopKey: 1,
   name: "milchprodukte"
 }, {
   identifier: "category-2",
-  shopKey: 1,
   name: "bananenprodukte"
 }];
 
-var categoriesPromise = CategoryBridge.saveCategories(categories);
-categoriesPromise.then(function(categories) {
-  console.log(categories);
+var categoriesPromise = CategoryBridge.saveCategories(shopKey, categories);
+categoriesPromise.then(function(job) {
+  console.log("categories:");
+  console.log(JSON.parse(job.payload));
 
   var products = [{
     identifier: "product-3",
-    shopKey: 1,
     name: "milch",
     categoryIdentifiers: ["category-3"],
     price: 100
   }, {
     identifier: "product-2",
-    shopKey: 1,
     name: "banane",
     categoryIdentifiers: ["category-2"],
     price: 100,
     salePrice: 50
   }];
 
-  var productsPromise = ProductBridge.saveProducts(products);
+  var productsPromise = ProductBridge.saveProducts(shopKey, products);
   productsPromise.then(function(products) {
-    console.log(products);
+    console.log("products:");
+    console.log(JSON.parse(job.payload));
+
+    console.log("done marie :)");
   });
 });
