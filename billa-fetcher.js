@@ -63,7 +63,7 @@ function preprocessProduct(tile) {
   product.shopKey = null;
   product.id = data.articleId;
   product.title = data.name;
-  product.name = data.slug;
+  product.slug = data.slug;
   product.imageUrl = getImageUrl(tile);
   product.brand = data.brand;
   product.categoryIds = data.articleGroupIds;
