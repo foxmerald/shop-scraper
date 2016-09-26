@@ -36,7 +36,11 @@ module.exports = class Product {
     };
     this.available = null; // boolean
     this.description = []; // array of strings e.g. "description", "more detailed description"
-    this.tags = []; // array of strings or object of booleans? e.g. frozen, bio, ...
+    this.tags = {
+      generalTags: [], // array of strings e.g. frozen, bio, ...
+      shopTags: [] // array of strings (own special tags used by shops e.g. Billa Tiefpreis)
+    };
+    this.eanCodes = [];
     this.similarProducts = []; // array of strings, containing productIds
     this.details = { // object for future details e.g. color or fabric for clothes?
       //nutrition: "",

@@ -53,6 +53,8 @@ function preprocessProducts(productsData) {
     products.push(product);
   }
 
+  debugger;
+
   return products;
 }
 
@@ -78,10 +80,13 @@ function preprocessProduct(tile) {
     pricePerUnit: data.unit // TODO implement own calculation
   };
 	*/
+  product.sale = Math.floor(data.price.sale * 100);
+  /*
   product.sale = {
     original: data.price.sale * 100, // TODO write global method for this case
     pricePerUnit: data.unit // TODO implement own calculation
   };
+  */
   product.discount = getProductDiscount(data);
   product.available = true;
   product.description.push(data.description);
@@ -95,7 +100,6 @@ function preprocessProduct(tile) {
 function getProductDiscount(data) {
   //TODO
   /*
-
   let discount = {
     bulkTypes: data.price.bulkDiscountPriceTypes,
     defaultPriceTypes: data.price.defaultPriceTypes,
@@ -116,48 +120,61 @@ function getImageUrl(data) {
 }
 
 function getProductTags(data) {
-  /*
   var attributes = data.attributes;
   var priceTypes = data.vtcPrice.defaultPriceTypes;
-  var tags = [];
+  var generalTags = [];
+  var shopTags = [];
 
   var translator = {
-  	"s_bio": "organic",
-  	"s_marke": "brand-name product",
-  	"s_gekuehlt": "cooled",
-  	"s_tiefgek": "frozen",
-  	"s_guetesie": "seal of quality",
-  	"s_spezern": "special diet",
-  	"s_herkunft": "country of origin",
-  	"s_hkland": "country of origin",
-  	"s_regio": "regional",
-  	"DAUERTIEFPREIS": "dauertiefpreis",
-  	"AKTION": "aktion",
-  	"SATTERRABATT": "satterrabatt",
+    "s_bio": "organic",
+    "s_marke": "brand",
+    "s_gekuehlt": "cooled",
+    "s_tiefgek": "frozen",
+    "s_guetesie": "seal of quality",
+    "s_spezern": "special diet",
+    "s_herkunft": "country of origin",
+    "s_hkland": "country of origin",
+    "s_regio": "regional",
+    "s_new": "new",
+    "mengemin": "varying weight",
   };
 
-  //TODO wenn nicht translatbar dann original drinnen lassen
+  if (attributes) {
+    for (let i = 0; i < attributes.length; i++) {
+      let attribute = attributes[i];
+      let tag = translator[attribute];
 
-  for (let i = 0; i < attributes.length; i++) {
-  	let attribute = attributes[i];
-  	let tag = translator[attribute];
-  	tags.push(tag);
+      if (tag) {
+        generalTags.push(tag);
+      } else {
+        shopTags.push(attribute);
+      }
+    }
+  }
+
+  if (priceTypes) {
+    for (let i = 0; i < priceTypes.length; i++) {
+      let priceType = priceTypes[i];
+      let tag = translator[priceType];
+
+      if (tag) {
+        generalTags.push(tag);
+      } else {
+        shopTags.push(priceType);
+      }
+    }
   }
 
   if (data.vtcOnly) {
-  	tags.push("online-shop only");
+    generalTags.push("online-shop only");
   }
 
-  if (priceTypes.length) {
-  	for (let i = 0; i < priceTypes.length; i++) {
-  		let priceType = priceTypes[i];
-  		let tag = translator[priceType];
-  		tags.push(tag);
-  	}
+  let tagsData = {
+    generalTags: generalTags,
+    shopTags: shopTags
   }
 
-  return tags;
-  */
+  return tagsData;
 }
 
 function preprocessCategories(categoryData) {
@@ -222,7 +239,7 @@ function fetchDataFromUrl(url) {
 
   let promise = request(options, (error, response, body) => {
     if (!error && response.statusCode === 200) {
-      console.log("raw billa data fetched");
+      console.log("raw billa data fetched from " + url);
       future.resolve(body);
     } else {
       console.error("billa raw data error: " + error);
