@@ -3,47 +3,46 @@
 const request = require("request");
 const util = require("util");
 const rp = require('request-promise');
+const deferred = require("deferred");
 
 var Promise = require("bluebird");
 var Product = require("./product-class");
 
-module.exports = {
-  fetchData: () => {
-    var testData = require("./billa-test-data");
+function fetchData() {
+  console.log("fetch billa data");
 
-    var categoriesUrl = "https://shop.billa.at/api/navigation";
-    var productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
+  var categoriesUrl = "https://shop.billa.at/api/navigation";
+  var productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
 
-    //TODO remove
-    //preprocessData(testData.categories, testData.products);
+  var categoriesPromise = fetchDataFromUrl(categoriesUrl);
+  var productPromise = fetchDataFromUrl(productsUrl);
 
-    var categoriesPromise = fetchDataFromUrl(request, categoriesUrl);
-    var productPromise = fetchDataFromUrl(request, productsUrl);
-
-    return Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
-      var preprocessedData = preprocessData(categories, products);
-
-      return preprocessedData;
-    }).catch((e) => {
-      console.error(e);
-    });
-  }
-};
+  return Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
+    console.log("preprocess billa data");
+    return preprocessData(categories, products);
+  }).catch((e) => {
+    console.error(e);
+  });
+}
 
 function preprocessData(categoriesData, productsData) {
   let categories = preprocessCategories(categoriesData);
+  let products = preprocessProducts(productsData);
 
-  let products = preprocessProducts(categories, productsData);
+  let categoriesList = [];
+  for (var category in categories) {
+    categoriesList.push(categories[category]);
+  }
 
   let data = {
-    categories: categories,
+    categories: categoriesList,
     products: products
   };
 
   return data;
 }
 
-function preprocessProducts(categories, productsData) {
+function preprocessProducts(productsData) {
   let products = [];
   let tiles = productsData.tiles;
 
@@ -62,32 +61,53 @@ function preprocessProduct(tile) {
   let product = new Product();
 
   product.shopKey = null;
-  product.identifier = data.articleId;
+  product.id = data.articleId;
   product.title = data.name;
   product.name = data.slug;
   product.imageUrl = getImageUrl(tile);
   product.brand = data.brand;
-  product.categoryIdentifiers = getProductCategories(tile);
+  product.categoryIds = data.articleGroupIds;
   product.amount = {
     weight: null,
     units: null
   };
+  product.price = Math.floor(data.price.normal * 100);
+  /*
   product.price = {
     original: data.price.normal * 100, // TODO write global method for this case
     pricePerUnit: data.unit // TODO implement own calculation
   };
+	*/
   product.sale = {
     original: data.price.sale * 100, // TODO write global method for this case
     pricePerUnit: data.unit // TODO implement own calculation
   };
-  product.discounts = []; // TODO add discounts
-  product.available = null;
+  product.discount = getProductDiscount(data);
+  product.available = true;
   product.description.push(data.description);
   product.tags = getProductTags(data);
   product.similarProducts = [];
-  product.details = {}
+  product.details.recommendedProductIds = data.recommendationArticleIds;
 
   return product;
+}
+
+function getProductDiscount(data) {
+  //TODO
+  /*
+
+  let discount = {
+    bulkTypes: data.price.bulkDiscountPriceTypes,
+    defaultPriceTypes: data.price.defaultPriceTypes,
+    additionalInfo: data.price.priceAdditionalInfo.vptxt
+  };
+
+  if (data.price.bulkDiscountPriceTypes.length > 1 || data.price.defaultPriceTypes.length > 1) {
+    debugger;
+  }
+
+  return discount;
+	*/
 }
 
 function getImageUrl(data) {
@@ -140,23 +160,6 @@ function getProductTags(data) {
   */
 }
 
-function getProductCategories(product, categories) {
-  /*
-  let articleGroupIds = product.articleGroupIds;
-  let productCategories = {
-    topcategories: [],
-    subcategories: [],
-    subsubcategories: []
-  };
-
-  for (let i = 0; i < articleGroupIds.length; i++) {
-    let id = articleGroupIds[i];
-
-    //add categories
-  }
-  */
-}
-
 function preprocessCategories(categoryData) {
   var categories = {};
 
@@ -166,9 +169,10 @@ function preprocessCategories(categoryData) {
     let subcategoryData = category.children;
 
     categories[categoryId] = {
+      identifier: categoryId,
       title: category.title,
-      name: getSegmentFromUrl(category.url, 1),
-      subcategories: []
+      slug: getSegmentFromUrl(category.url, 1),
+      subcategoryIdentifiers: []
     }
 
     for (let j = 0; j < subcategoryData.length; j++) {
@@ -177,24 +181,26 @@ function preprocessCategories(categoryData) {
       let subsubcategoryData = subcategory.children;
 
       categories[subcategoryId] = {
+        identifier: subcategoryId,
         title: subcategory.title,
-        name: getSegmentFromUrl(subcategory.url, 2),
-        subcategories: []
+        slug: getSegmentFromUrl(subcategory.url, 2),
+        subcategoryIdentifiers: []
       }
 
-      categories[categoryId].subcategories.push(subcategoryId);
+      categories[categoryId].subcategoryIdentifiers.push(subcategoryId);
 
       for (let k = 0; k < subsubcategoryData.length; k++) {
         let subsubcategory = subsubcategoryData[k];
         let subsubcategoryId = subsubcategory.articleGroupId;
 
         categories[subsubcategoryId] = {
+          identifier: subsubcategoryId,
           title: subsubcategory.title,
-          name: getSegmentFromUrl(subsubcategory.url, 3),
-          subcategories: []
+          slug: getSegmentFromUrl(subsubcategory.url, 3),
+          subcategoryIdentifiers: []
         }
 
-        categories[subcategoryId].subcategories.push(subsubcategoryId);
+        categories[subcategoryId].subcategoryIdentifiers.push(subsubcategoryId);
       }
     }
   }
@@ -206,22 +212,27 @@ function getSegmentFromUrl(string, segment) {
   return string.split("/")[segment];
 }
 
-function fetchDataFromUrl(request, url) {
+function fetchDataFromUrl(url) {
+  var future = deferred();
+
   let options = {
     url: url,
     json: true
   };
 
-  let promise = new Promise((resolve, reject) => {
-    request(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        resolve(body);
-      } else {
-        console.error("Error: " + error);
-        reject(error);
-      }
-    });
+  let promise = request(options, (error, response, body) => {
+    if (!error && response.statusCode === 200) {
+      console.log("raw billa data fetched");
+      future.resolve(body);
+    } else {
+      console.error("billa raw data error: " + error);
+      future.reject(error);
+    }
   });
 
-  return promise;
+  return future.promise;
+}
+
+module.exports = {
+  fetchData: fetchData
 }
