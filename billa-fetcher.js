@@ -98,20 +98,24 @@ function preprocessProduct(tile) {
 }
 
 function getProductDiscount(data) {
-  //TODO
-  /*
+  let defaultPriceTypes = data.price.defaultPriceTypes;
+  let bulkDiscountPriceTypes = data.price.bulkDiscountPriceTypes;
+
+  if (!defaultPriceTypes.length && !bulkDiscountPriceTypes.length) {
+    return null;
+  }
+
+  if (!defaultPriceTypes.length) {
+    defaultPriceTypes.push("AKTION");
+  }
+
   let discount = {
-    bulkTypes: data.price.bulkDiscountPriceTypes,
-    defaultPriceTypes: data.price.defaultPriceTypes,
+    types: defaultPriceTypes,
+    conditions: bulkDiscountPriceTypes,
     additionalInfo: data.price.priceAdditionalInfo.vptxt
   };
 
-  if (data.price.bulkDiscountPriceTypes.length > 1 || data.price.defaultPriceTypes.length > 1) {
-    debugger;
-  }
-
   return discount;
-	*/
 }
 
 function getImageUrl(data) {
@@ -120,12 +124,7 @@ function getImageUrl(data) {
 }
 
 function getProductTags(data) {
-  var attributes = data.attributes;
-  var priceTypes = data.vtcPrice.defaultPriceTypes;
-  var generalTags = [];
-  var shopTags = [];
-
-  var translator = {
+  const translator = {
     "s_bio": "organic",
     "s_marke": "brand",
     "s_gekuehlt": "cooled",
@@ -138,6 +137,11 @@ function getProductTags(data) {
     "s_new": "new",
     "mengemin": "varying weight",
   };
+
+  var attributes = data.attributes;
+  var priceTypes = data.vtcPrice.defaultPriceTypes;
+  var generalTags = [];
+  var shopTags = [];
 
   if (attributes) {
     for (let i = 0; i < attributes.length; i++) {
