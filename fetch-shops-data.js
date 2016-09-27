@@ -21,6 +21,8 @@ billaPromise.then(data => {
 });
 
 function sendData(shopKey, data) {
+  //TODO schick in päckchen von hundert
+
   var products = data.products.slice(0, 99); //TODO remove
 
   var categoryPromise = CategoryBridge.saveCategories(shopKey, data.categories);

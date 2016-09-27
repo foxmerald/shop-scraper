@@ -62,39 +62,121 @@ function preprocessProduct(tile) {
   let data = tile.data;
   let product = new Product();
 
+  let price = Math.floor(data.price.normal * 100);
+  let salePrice = Math.floor(data.price.sale * 100);
+
   product.shopKey = null;
-  product.id = data.articleId;
+  product.identifier = data.articleId;
   product.title = data.name;
   product.slug = data.slug;
-  product.imageUrl = getImageUrl(tile);
+  product.categoryIdentifiers = data.articleGroupIds;
   product.brand = data.brand;
-  product.categoryIds = data.articleGroupIds;
-  product.amount = {
-    weight: null,
-    units: null
-  };
-  product.price = Math.floor(data.price.normal * 100);
-  /*
-  product.price = {
-    original: data.price.normal * 100, // TODO write global method for this case
-    pricePerUnit: data.unit // TODO implement own calculation
-  };
-	*/
-  product.sale = Math.floor(data.price.sale * 100);
-  /*
-  product.sale = {
-    original: data.price.sale * 100, // TODO write global method for this case
-    pricePerUnit: data.unit // TODO implement own calculation
-  };
-  */
+  product.imageUrl = getImageUrl(data);
+
+  product.amount = data.grammage;
+
+  product.price = price;
+  product.salePrice = salePrice;
+
+  product.pricePerUnit = getProductAmount(data, price);
+  product.salePricePerUnit = getProductAmount(data, salePrice);
+
   product.discount = getProductDiscount(data);
   product.available = true;
+  product.similarProducts = [];
+
   product.description.push(data.description);
   product.tags = getProductTags(data);
-  product.similarProducts = [];
   product.details.recommendedProductIds = data.recommendationArticleIds;
 
   return product;
+}
+
+function getProductAmount(data, price) {
+  let grammageSplit = data.grammage.split(" ");
+
+  let amount = grammageSplit[0];
+  let unit = grammageSplit[1];
+  let packageType = grammageSplit[2];
+
+  switch (unit) {
+    case "Kilogramm":
+      amount = amount * 1000;
+      unit = "Gramm";
+      break;
+    case "Liter":
+      amount = amount * 1000;
+      unit = "Milliliter";
+      break;
+    case "Meter":
+      amount = amount * 100;
+      unit = "Zentimeter";
+      break;
+    default:
+      break;
+  }
+
+  if (!isInt(amount)) {
+    amount = Math.round(unit);
+  }
+
+  debugger;
+
+  /*
+  EINHEIT:
+  "Beutel",
+  "Blatt",
+  "Bund",
+  "Gramm",
+  "Kilogramm",
+  "Liter",
+  "Meter",
+  "Milliliter",
+  //"Paar",
+  "Packung",
+  "Portion",
+  "Rollen",
+  "Stück",
+  "Teebeutel",
+  "Waschgang",
+  "Zentimeter",
+  */
+
+  /*
+  VERPACKUNG:
+  "Becher",
+  "Beutel",
+  "Blister",
+  "Box",
+  "Brief",
+  "Bund",
+  "Dose",
+  "Flasche",
+  "Geschenkkarton",
+  "Glas",
+  "Kanister",
+  "Karton",
+  "Kilo",
+  "Korb",
+  "Kuebel",
+  "Packung",
+  "Paket",
+  "Riegel",
+  "Rolle",
+  "Sack",
+  "Schachtel",
+  "Spray",
+  "Stück",
+  "Tafel",
+  "Tasse",
+  "Tiegel",
+  "Tube",
+  */
+
+}
+
+function isInt(n) {
+  return Number(n) === n && n % 1 === 0;
 }
 
 function getProductDiscount(data) {

@@ -9,21 +9,18 @@ module.exports = class Product {
 
   constructor() {
     this.key = null;
-    this.identifier = null;
     this.shopKey = null;
-    this.title = null;
+    this.identifier = null;
     this.slug = null;
+    this.title = null;
+    this.categoryKeys = []; // array of our own categoryKeys
+    this.categoryIdentifiers = []; // array of the shop's categoryIds
     this.imageUrl = null;
     this.brand = null;
-    this.categoryKeys = []; // array of categoryKeys e.g. ["Obst&Gemüse", "Obst", "Zitrusfrüchte", "Orangen"]
-    this.price = {
-      original: null,
-      pricePerUnit: null
-    };
-    this.sale = {
-      original: null,
-      pricePerUnit: null
-    };
+    this.price = null; // long
+    this.salePrice = null; // long
+    this.pricePerUnit = null;
+    this.salePricePerUnit = null;
     this.amount = {
       weight: null,
       units: null
