@@ -20,7 +20,9 @@ function fetchData() {
 
   return Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
     Logger.log("preprocess billa data");
-    return preprocessData(categories, products);
+    let preprocessedData = preprocessData(categories, products);
+
+    return preprocessedData;
   }).catch((e) => {
     Logger.error(e);
   });
@@ -54,8 +56,6 @@ function preprocessProducts(productsData) {
     products.push(product);
   }
 
-  debugger;
-
   return products;
 }
 
@@ -64,32 +64,27 @@ function preprocessProduct(tile) {
   let price = Math.floor(data.price.normal * 100);
   let salePrice = Math.floor(data.price.sale * 100);
 
-  let product = {
-    identifier: data.articleId,
-    title: data.name,
-    slug: data.slug,
-    categoryIdentifiers: data.articleGroupIds,
-    brand: data.brand,
-    imageUrl: getImageUrl(data),
-    amount: data.grammage,
-    price: price,
-    salePrice: salePrice,
-    pricePerUnit: getPricePerUnit(data, price),
-    salePricePerUnit: getPricePerUnit(data, salePrice),
-    discount: getProductDiscount(data),
-    available: true,
-    tags: getProductTags(data),
-    details: {
-      recommendedProductIds: data.recommendationArticleIds,
-    },
-    description: [data.description],
-  };
+  let product = new Product();
 
-  let finalProduct = new Product(product);
+  product.identifier = data.articleId;
+  product.title = data.name;
+  product.slug = data.slug;
+  product.categoryIdentifiers = data.articleGroupIds;
+  product.brand = data.brand;
+  product.imageUrl = getImageUrl(data);
+  product.amount = data.grammage;
+  product.price = price;
+  product.salePrice = salePrice;
+  product.pricePerUnit = getPricePerUnit(data, price);
+  product.salePricePerUnit = getPricePerUnit(data, salePrice);
+  product.discount = getProductDiscount(data);
+  product.tags = getProductTags(data);
+  product.details.recommendedProductIds = data.recommendationArticleIds;
+  product.description = data.description;
 
-  debugger;
+  product.checkFormat(product);
 
-  return finalProduct;
+  return product;
 }
 
 function getPricePerUnit(data, price) {
@@ -280,7 +275,11 @@ function fetchDataFromUrl(url) {
 
   let options = {
     url: url,
-    json: true
+    json: true,
+    "rejectUnauthorized": false,
+    "headers": {
+      "Content-Type": "application/json",
+    },
   };
 
   let promise = request(options, (error, response, body) => {

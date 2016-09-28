@@ -7,8 +7,6 @@ const serverUrl = "http://localhost:7000";
 
 const ServerBridge = (function() {
   function pollJob(jobUrl, jobKey, future) {
-    debugger;
-
     if (!future) {
       future = deferred();
     }
@@ -28,11 +26,8 @@ const ServerBridge = (function() {
       }, 500);
     }
 
-    debugger;
-
     var promise = requestPromise(requestOptions);
     promise.then(function(job) {
-      debugger;
       if (job.closedTimestamp > 0) {
         future.resolve(job);
       } else {
@@ -44,8 +39,6 @@ const ServerBridge = (function() {
   }
 
   function requestJob(requestOptions, jobUrl) {
-    debugger;
-
     var future = deferred();
 
     var promise = requestPromise(requestOptions);
@@ -105,8 +98,6 @@ var ProductBridge = (function() {
     };
 
     let jobUrl = requestUrl + "/job";
-
-    debugger;
 
     var promise = ServerBridge.requestJob(requestOptions, jobUrl);
     return promise;
