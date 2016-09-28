@@ -2,10 +2,17 @@
 
 const request = require('request');
 
-console.log("start fetching data");
+var ProductImporter = require("./product-importer");
+var CategoryBridge = ProductImporter.CategoryBridge;
+var ProductBridge = ProductImporter.ProductBridge;
+var Logger = require("./log-bridge");
 
-var CategoryBridge = require("./product-importer").CategoryBridge;
-var ProductBridge = require("./product-importer").ProductBridge;
+const shopKeys = {
+  billa: 1,
+  merkur: 2,
+}
+
+Logger.log("start fetching data");
 
 var billaFetcher = require("./billa-fetcher");
 //var merkurFetcher = require("./merkur-fetcher");
@@ -14,10 +21,10 @@ var billaPromise = billaFetcher.fetchData();
 //var merkurPromise = merkurFetcher.fetchData();
 
 billaPromise.then(data => {
-  console.log("send billa data");
-  sendData(1, data);
+  Logger.log("send billa data");
+  sendData(shopKeys.billa, data);
 }).catch(e => {
-  console.error(e);
+  Logger.error(e);
 });
 
 function sendData(shopKey, data) {
@@ -29,17 +36,17 @@ function sendData(shopKey, data) {
   var productPromise = ProductBridge.saveProducts(shopKey, products);
 
   categoryPromise.then(result => {
-    console.log("billa category-data sent");
-    console.log(result);
+    Logger.log("billa category-data sent");
+    Logger.log(result);
   }).catch(error => {
-    console.error("billa category-data error: " + error);
+    Logger.error("billa category-data error: " + error);
   });
 
   productPromise.then(result => {
-    console.log("billa products-data sent");
-    console.log(result);
+    Logger.log("billa products-data sent");
+    Logger.log(result);
   }).catch(error => {
-    console.error("billa products-data error: " + error);
+    Logger.error("billa products-data error: " + error);
   });
 }
 
