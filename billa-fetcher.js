@@ -7,9 +7,10 @@ const deferred = require("deferred");
 
 var Promise = require("bluebird");
 var Product = require("./product-class");
+var Logger = require("./log-bridge");
 
 function fetchData() {
-  console.log("fetch billa data");
+  Logger.log("fetch billa data");
 
   var categoriesUrl = "https://shop.billa.at/api/navigation";
   var productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
@@ -18,10 +19,10 @@ function fetchData() {
   var productPromise = fetchDataFromUrl(productsUrl);
 
   return Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
-    console.log("preprocess billa data");
+    Logger.log("preprocess billa data");
     return preprocessData(categories, products);
   }).catch((e) => {
-    console.error(e);
+    Logger.error(e);
   });
 }
 
@@ -60,123 +61,72 @@ function preprocessProducts(productsData) {
 
 function preprocessProduct(tile) {
   let data = tile.data;
-  let product = new Product();
-
   let price = Math.floor(data.price.normal * 100);
   let salePrice = Math.floor(data.price.sale * 100);
 
-  product.shopKey = null;
-  product.identifier = data.articleId;
-  product.title = data.name;
-  product.slug = data.slug;
-  product.categoryIdentifiers = data.articleGroupIds;
-  product.brand = data.brand;
-  product.imageUrl = getImageUrl(data);
+  let product = {
+    identifier: data.articleId,
+    title: data.name,
+    slug: data.slug,
+    categoryIdentifiers: data.articleGroupIds,
+    brand: data.brand,
+    imageUrl: getImageUrl(data),
+    amount: data.grammage,
+    price: price,
+    salePrice: salePrice,
+    pricePerUnit: getPricePerUnit(data, price),
+    salePricePerUnit: getPricePerUnit(data, salePrice),
+    discount: getProductDiscount(data),
+    available: true,
+    tags: getProductTags(data),
+    details: {
+      recommendedProductIds: data.recommendationArticleIds,
+    },
+    description: [data.description],
+  };
 
-  product.amount = data.grammage;
+  let finalProduct = new Product(product);
 
-  product.price = price;
-  product.salePrice = salePrice;
+  debugger;
 
-  product.pricePerUnit = getProductAmount(data, price);
-  product.salePricePerUnit = getProductAmount(data, salePrice);
-
-  product.discount = getProductDiscount(data);
-  product.available = true;
-  product.similarProducts = [];
-
-  product.description.push(data.description);
-  product.tags = getProductTags(data);
-  product.details.recommendedProductIds = data.recommendationArticleIds;
-
-  return product;
+  return finalProduct;
 }
 
-function getProductAmount(data, price) {
-  let grammageSplit = data.grammage.split(" ");
+function getPricePerUnit(data, price) {
+  const referenceAmount = 1;
 
-  let amount = grammageSplit[0];
+  let grammageSplit = data.grammage.split(" ");
+  let amount = parseFloat(grammageSplit[0]);
   let unit = grammageSplit[1];
   let packageType = grammageSplit[2];
 
   switch (unit) {
-    case "Kilogramm":
-      amount = amount * 1000;
-      unit = "Gramm";
+    case "Milliliter":
+      amount = amount / 1000;
+      unit = "Liter";
       break;
-    case "Liter":
-      amount = amount * 1000;
-      unit = "Milliliter";
+    case "Gramm":
+      amount = amount / 1000;
+      unit = "Kilogramm";
       break;
-    case "Meter":
-      amount = amount * 100;
-      unit = "Zentimeter";
+    case "Zentimeter":
+      amount = amount / 100;
+      unit = "Meter";
       break;
     default:
       break;
   }
 
-  if (!isInt(amount)) {
-    amount = Math.round(unit);
-  }
+  let unitMultiplicator = referenceAmount / amount;
 
-  debugger;
+  let pricePerUnit = {
+    amount: referenceAmount,
+    unit: unit,
+    packageType: packageType,
+    price: Math.round(price * unitMultiplicator),
+  };
 
-  /*
-  EINHEIT:
-  "Beutel",
-  "Blatt",
-  "Bund",
-  "Gramm",
-  "Kilogramm",
-  "Liter",
-  "Meter",
-  "Milliliter",
-  //"Paar",
-  "Packung",
-  "Portion",
-  "Rollen",
-  "Stück",
-  "Teebeutel",
-  "Waschgang",
-  "Zentimeter",
-  */
-
-  /*
-  VERPACKUNG:
-  "Becher",
-  "Beutel",
-  "Blister",
-  "Box",
-  "Brief",
-  "Bund",
-  "Dose",
-  "Flasche",
-  "Geschenkkarton",
-  "Glas",
-  "Kanister",
-  "Karton",
-  "Kilo",
-  "Korb",
-  "Kuebel",
-  "Packung",
-  "Paket",
-  "Riegel",
-  "Rolle",
-  "Sack",
-  "Schachtel",
-  "Spray",
-  "Stück",
-  "Tafel",
-  "Tasse",
-  "Tiegel",
-  "Tube",
-  */
-
-}
-
-function isInt(n) {
-  return Number(n) === n && n % 1 === 0;
+  return pricePerUnit;
 }
 
 function getProductDiscount(data) {
@@ -194,7 +144,7 @@ function getProductDiscount(data) {
   let discount = {
     types: defaultPriceTypes,
     conditions: bulkDiscountPriceTypes,
-    additionalInfo: data.price.priceAdditionalInfo.vptxt
+    additionalInfo: data.price.priceAdditionalInfo.vptxt,
   };
 
   return discount;
@@ -222,9 +172,12 @@ function getProductTags(data) {
 
   var attributes = data.attributes;
   var priceTypes = data.vtcPrice.defaultPriceTypes;
+  var normalPrice = data.price.normal;
+  var salePrice = data.price.sale;
   var generalTags = [];
   var shopTags = [];
 
+  // add tags like "cooled" or "organic"
   if (attributes) {
     for (let i = 0; i < attributes.length; i++) {
       let attribute = attributes[i];
@@ -238,6 +191,7 @@ function getProductTags(data) {
     }
   }
 
+  // add tags like "dauertiefpreis" or "satterrabatt"
   if (priceTypes) {
     for (let i = 0; i < priceTypes.length; i++) {
       let priceType = priceTypes[i];
@@ -251,13 +205,19 @@ function getProductTags(data) {
     }
   }
 
+  // check if online-shop only
   if (data.vtcOnly) {
     generalTags.push("online-shop only");
   }
 
+  // check if on sale
+  if (normalPrice !== salePrice) {
+    generalTags.push("sale");
+  }
+
   let tagsData = {
     generalTags: generalTags,
-    shopTags: shopTags
+    shopTags: shopTags,
   }
 
   return tagsData;
@@ -275,7 +235,7 @@ function preprocessCategories(categoryData) {
       identifier: categoryId,
       title: category.title,
       slug: getSegmentFromUrl(category.url, 1),
-      subcategoryIdentifiers: []
+      subcategoryIdentifiers: [],
     }
 
     for (let j = 0; j < subcategoryData.length; j++) {
@@ -287,7 +247,7 @@ function preprocessCategories(categoryData) {
         identifier: subcategoryId,
         title: subcategory.title,
         slug: getSegmentFromUrl(subcategory.url, 2),
-        subcategoryIdentifiers: []
+        subcategoryIdentifiers: [],
       }
 
       categories[categoryId].subcategoryIdentifiers.push(subcategoryId);
@@ -300,7 +260,7 @@ function preprocessCategories(categoryData) {
           identifier: subsubcategoryId,
           title: subsubcategory.title,
           slug: getSegmentFromUrl(subsubcategory.url, 3),
-          subcategoryIdentifiers: []
+          subcategoryIdentifiers: [],
         }
 
         categories[subcategoryId].subcategoryIdentifiers.push(subsubcategoryId);
@@ -325,10 +285,10 @@ function fetchDataFromUrl(url) {
 
   let promise = request(options, (error, response, body) => {
     if (!error && response.statusCode === 200) {
-      console.log("raw billa data fetched from " + url);
+      Logger.log("raw billa data fetched from " + url);
       future.resolve(body);
     } else {
-      console.error("billa raw data error: " + error);
+      Logger.error("billa raw data error from " + url + ": " + error);
       future.reject(error);
     }
   });
@@ -337,5 +297,5 @@ function fetchDataFromUrl(url) {
 }
 
 module.exports = {
-  fetchData: fetchData
-}
+  fetchData: fetchData,
+};
