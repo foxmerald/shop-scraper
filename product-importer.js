@@ -2,6 +2,7 @@
 
 const requestPromise = require("request-promise");
 const deferred = require("deferred");
+const Logger = require("./log-bridge");
 
 const serverUrl = "http://localhost:7000";
 
@@ -50,9 +51,68 @@ const ServerBridge = (function() {
     return future.promise;
   }
 
+  function startImport(shopKey) {
+    var future = deferred();
+
+    let options = {
+      method: "POST",
+      url: serverUrl + "/products/start",
+      body: {
+        shopKey: shopKey
+      },
+      json: true,
+      qs: {
+        shopKey: shopKey
+      }
+    };
+
+    let promise = requestPromise(options, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        Logger.log(`import started - data fetched from ${url}: ${body}`);
+        future.resolve(body);
+      } else {
+        Logger.error(`error from ${url}: ${error}`);
+        future.reject(error);
+      }
+    });
+
+    return future.promise;
+  }
+
+  function finishImport(shopKey, jobKey) {
+    var future = deferred();
+
+    let options = {
+      method: "POST",
+      url: serverUrl + "/products/start",
+      body: {
+        shopKey: shopKey,
+        jobKey: jobKey,
+      },
+      json: true,
+      qs: {
+        shopKey: shopKey
+      }
+    };
+
+    let promise = requestPromise(options, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        Logger.log(`import finished - data fetched from ${url}: ${body}`);
+        future.resolve(body);
+      } else {
+        Logger.error(`error from ${url}: ${error}`);
+        future.reject(error);
+      }
+    });
+
+    return future.promise;
+  }
+
   var bridge = {};
   bridge.pollJob = pollJob;
   bridge.requestJob = requestJob;
+  bridge.startImport = startImport;
+  bridge.finishImport = finishImport;
 
   return bridge;
 })();
@@ -64,7 +124,10 @@ var CategoryBridge = (function() {
     let requestOptions = {
       method: "POST",
       uri: requestUrl,
-      body: categories,
+      body: {
+        shopKey: shopKey,
+        categories: categories
+      },
       json: true,
       qs: {
         shopKey: shopKey
@@ -85,12 +148,15 @@ var CategoryBridge = (function() {
 
 var ProductBridge = (function() {
   function saveProducts(shopKey, products) {
-    let requestUrl = serverUrl + "/products"
+    let requestUrl = serverUrl + "/products";
 
     let requestOptions = {
       method: "POST",
       uri: requestUrl,
-      body: products,
+      body: {
+        shopKey: shopKey,
+        products: products
+      },
       json: true,
       qs: {
         shopKey: shopKey
@@ -103,8 +169,30 @@ var ProductBridge = (function() {
     return promise;
   }
 
+  function sendProducts(shopKey, products) {
+    var future = deferred();
+    var productsPromises = [];
+
+    while (products.length) {
+      let productsStack = products.splice(0, 100);
+      let promise = saveProducts(shopKey, productsStack);
+
+      productsPromises.push(promise);
+    }
+
+    Promise.all(productsPromises).then(result => {
+      future.resolve(result);
+    }).catch(e => {
+      Logger.error(e);
+      future.reject();
+    })
+
+    return future.promise;
+  }
+
   var bridge = {};
   bridge.saveProducts = saveProducts;
+  bridge.sendProducts = sendProducts;
 
   return bridge;
 })();
@@ -151,5 +239,6 @@ categoriesPromise.then(function(job) {
 
 module.exports = {
   ProductBridge: ProductBridge,
-  CategoryBridge: CategoryBridge
+  CategoryBridge: CategoryBridge,
+  ServerBridge: ServerBridge,
 }

@@ -1,10 +1,14 @@
 "use strict";
 
 const request = require('request');
+const requestPromise = require("request-promise");
+const deferred = require("deferred");
 
 var ProductImporter = require("./product-importer");
 var CategoryBridge = ProductImporter.CategoryBridge;
 var ProductBridge = ProductImporter.ProductBridge;
+var ServerBridge = ProductImporter.ServerBridge;
+
 var Logger = require("./log-bridge");
 
 const shopKeys = {
@@ -22,47 +26,44 @@ var billaPromise = billaFetcher.fetchData();
 
 billaPromise.then(data => {
   Logger.log("send billa data");
-  sendData(shopKeys.billa, data);
+
+  sendCategoriesData(shopKeys.billa, data.categories);
+  sendProductsData(shopKeys.billa, data.products);
 }).catch(e => {
   Logger.error(e);
 });
 
-function sendData(shopKey, data) {
-  //TODO schick in päckchen von hundert
+function sendProductsData(shopKey, products) {
+  Logger.log("products start import");
 
-  var products = data.products.slice(0, 99); //TODO remove
+  ServerBridge.startImport(shopKey).then(job => {
+    Logger.log("products import started");
+    var jobKey = job.key;
 
-  var categoryPromise = CategoryBridge.saveCategories(shopKey, data.categories);
-  var productPromise = ProductBridge.saveProducts(shopKey, products);
+    ProductBridge.sendProducts(shopKey, products).then(result => {
+      Logger.log("products sent");
 
-  categoryPromise.then(result => {
-    Logger.log("billa category-data sent");
-    Logger.log(result);
-  }).catch(error => {
-    Logger.error("billa category-data error: " + error);
-  });
-
-  productPromise.then(result => {
-    Logger.log("billa products-data sent");
-    Logger.log(result);
-  }).catch(error => {
-    Logger.error("billa products-data error: " + error);
-  });
+      ServerBridge.finishImport(shopKey, jobKey).then(job => {
+        Logger.log("products import finished");
+      }).catch(e => Logger.error(e));
+    }).catch(e => Logger.error(e));
+  }).catch(e => Logger.error(e));
 }
 
-/*
-merkurPromise.then(data => {
-var categoryPromise = CategoryBridge.saveCategories(2, data.categories);
-var productPromise = ProductBridge.saveProducts(2, data.products);
+function sendCategoriesData(shopKey, categories) {
+  Logger.log("categories start import");
 
-categoryPromise.then(result => {
-  console.log(result);
-}).catch(error => {console.error(error);};
+  ServerBridge.startImport(shopKey).then(job => {
+    Logger.log("categories import started");
 
-productPromise.then(result => {
-  console.log(result);
-}).catch(error => {console.error(error);};
-}).catch(e => {
-  console.error(e);
-});
-*/
+    var jobKey = job.key;
+
+    CategoryBridge.saveCategories(shopKey, categories).then(result => {
+      Logger.log("categories sent");
+
+      ServerBridge.finishImport(shopKey, jobKey).then(job => {
+        Logger.log("categories import finished");
+      }).catch(e => Logger.error(e));
+    }).catch(e => Logger.error(e));
+  }).catch(e => Logger.error(e));
+}
