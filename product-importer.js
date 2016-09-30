@@ -52,11 +52,12 @@ const ServerBridge = (function() {
   }
 
   function startImport(shopKey) {
-    var future = deferred();
+    let future = deferred();
 
+    let url = serverUrl + "/products/start";
     let options = {
       method: "POST",
-      url: serverUrl + "/products/start",
+      url: url,
       body: {
         shopKey: shopKey
       },
@@ -80,11 +81,12 @@ const ServerBridge = (function() {
   }
 
   function finishImport(shopKey, jobKey) {
-    var future = deferred();
+    let future = deferred();
 
+    let url = serverUrl + "/products/finish";
     let options = {
       method: "POST",
-      url: serverUrl + "/products/start",
+      url: url,
       body: {
         shopKey: shopKey,
         jobKey: jobKey,
@@ -147,7 +149,7 @@ var CategoryBridge = (function() {
 })();
 
 var ProductBridge = (function() {
-  function saveProducts(shopKey, products) {
+  function saveProductBatch(shopKey, products) {
     let requestUrl = serverUrl + "/products";
 
     let requestOptions = {
@@ -169,13 +171,13 @@ var ProductBridge = (function() {
     return promise;
   }
 
-  function sendProducts(shopKey, products) {
+  function saveProducts(shopKey, products) {
     var future = deferred();
     var productsPromises = [];
 
     while (products.length) {
-      let productsStack = products.splice(0, 100);
-      let promise = saveProducts(shopKey, productsStack);
+      let productsStack = products.splice(0, 1000);
+      let promise = saveProductBatch(shopKey, productsStack);
 
       productsPromises.push(promise);
     }
@@ -192,7 +194,6 @@ var ProductBridge = (function() {
 
   var bridge = {};
   bridge.saveProducts = saveProducts;
-  bridge.sendProducts = sendProducts;
 
   return bridge;
 })();

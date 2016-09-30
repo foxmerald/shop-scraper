@@ -27,30 +27,39 @@ var billaPromise = billaFetcher.fetchData();
 billaPromise.then(data => {
   Logger.log("send billa data");
 
-  sendCategoriesData(shopKeys.billa, data.categories);
-  sendProductsData(shopKeys.billa, data.products);
-}).catch(e => {
-  Logger.error(e);
-});
+  var categoriesPromise = sendCategoriesData(shopKeys.billa, data.categories);
+  categoriesPromise.then(function() {
+    var productsPromise = sendProductsData(shopKeys.billa, data.products);
+    productsPromise.catch(Logger.error);
+  }).catch(Logger.error);
+}).catch(Logger.error);
 
 function sendProductsData(shopKey, products) {
+  var future = deferred();
+
   Logger.log("products start import");
 
   ServerBridge.startImport(shopKey).then(job => {
     Logger.log("products import started");
     var jobKey = job.key;
 
-    ProductBridge.sendProducts(shopKey, products).then(result => {
+    ProductBridge.saveProducts(shopKey, products).then(result => {
       Logger.log("products sent");
 
       ServerBridge.finishImport(shopKey, jobKey).then(job => {
         Logger.log("products import finished");
-      }).catch(e => Logger.error(e));
-    }).catch(e => Logger.error(e));
-  }).catch(e => Logger.error(e));
+
+        future.resolve();
+      }).catch(future.reject);
+    }).catch(future.reject);
+  }).catch(future.reject);
+
+  return future.promise;
 }
 
 function sendCategoriesData(shopKey, categories) {
+  var future = deferred();
+
   Logger.log("categories start import");
 
   ServerBridge.startImport(shopKey).then(job => {
@@ -63,7 +72,11 @@ function sendCategoriesData(shopKey, categories) {
 
       ServerBridge.finishImport(shopKey, jobKey).then(job => {
         Logger.log("categories import finished");
-      }).catch(e => Logger.error(e));
-    }).catch(e => Logger.error(e));
-  }).catch(e => Logger.error(e));
+
+        future.resolve();
+      }).catch(future.reject);
+    }).catch(future.reject);
+  }).catch(future.reject);
+
+  return future.promise;
 }
