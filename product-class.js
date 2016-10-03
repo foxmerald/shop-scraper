@@ -3,7 +3,7 @@
 const schema = require("js-schema");
 const validate = schema({
   "key": [Number, null],
-  "shopKey": [Number, null],
+  "shopDataKey": [Number, null],
   "identifier": String,
   "slug": String,
   "title": String,
@@ -49,7 +49,7 @@ module.exports = class Product {
   /**
    * @param {object} product An object containing infos of a product
    * @param {number} key
-   * @param {number} shopKey
+   * @param {number} shopDataKey
    * @param {string} identifier
    * @param {string} slug
    * @param {string} title
@@ -72,7 +72,7 @@ module.exports = class Product {
 
   constructor() {
     this.key = null;
-    this.shopKey = null;
+    this.shopDataKey = null;
     this.identifier = null;
     this.slug = null;
     this.title = null;

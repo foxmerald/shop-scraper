@@ -11,7 +11,7 @@ var ServerBridge = ProductImporter.ServerBridge;
 
 var Logger = require("./log-bridge");
 
-const shopKeys = {
+const shopDataKeys = {
   billa: 1,
   merkur: 2,
 }
@@ -27,26 +27,26 @@ var billaPromise = billaFetcher.fetchData();
 billaPromise.then(data => {
   Logger.log("send billa data");
 
-  var categoriesPromise = sendCategoriesData(shopKeys.billa, data.categories);
+  var categoriesPromise = sendCategoriesData(shopDataKeys.billa, data.categories);
   categoriesPromise.then(function() {
-    var productsPromise = sendProductsData(shopKeys.billa, data.products);
+    var productsPromise = sendProductsData(shopDataKeys.billa, data.products);
     productsPromise.catch(Logger.error);
   }).catch(Logger.error);
 }).catch(Logger.error);
 
-function sendProductsData(shopKey, products) {
+function sendProductsData(shopDataKey, products) {
   var future = deferred();
 
   Logger.log("products start import");
 
-  ServerBridge.startImport(shopKey).then(job => {
+  ProductBridge.startImport(shopDataKey).then(job => {
     Logger.log("products import started");
     var jobKey = job.key;
 
-    ProductBridge.saveProducts(shopKey, products).then(result => {
+    ProductBridge.saveProducts(shopDataKey, products).then(result => {
       Logger.log("products sent");
 
-      ServerBridge.finishImport(shopKey, jobKey).then(job => {
+      ProductBridge.finishImport(shopDataKey, jobKey).then(job => {
         Logger.log("products import finished");
 
         future.resolve();
@@ -57,20 +57,20 @@ function sendProductsData(shopKey, products) {
   return future.promise;
 }
 
-function sendCategoriesData(shopKey, categories) {
+function sendCategoriesData(shopDataKey, categories) {
   var future = deferred();
 
   Logger.log("categories start import");
 
-  ServerBridge.startImport(shopKey).then(job => {
+  CategoryBridge.startImport(shopDataKey).then(job => {
     Logger.log("categories import started");
 
     var jobKey = job.key;
 
-    CategoryBridge.saveCategories(shopKey, categories).then(result => {
+    CategoryBridge.saveCategories(shopDataKey, categories).then(result => {
       Logger.log("categories sent");
 
-      ServerBridge.finishImport(shopKey, jobKey).then(job => {
+      CategoryBridge.finishImport(shopDataKey, jobKey).then(job => {
         Logger.log("categories import finished");
 
         future.resolve();
