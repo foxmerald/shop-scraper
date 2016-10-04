@@ -30,7 +30,7 @@ function fetchData() {
 
 function preprocessData(categoriesData, productsData) {
   let categories = preprocessCategories(categoriesData);
-  let products = preprocessProducts(productsData);
+  let products = preprocessProducts(productsData, categories);
 
   let categoriesList = [];
   for (var category in categories) {
@@ -45,13 +45,13 @@ function preprocessData(categoriesData, productsData) {
   return data;
 }
 
-function preprocessProducts(productsData) {
+function preprocessProducts(productsData, categories) {
   let products = [];
   let tiles = productsData.tiles;
 
   for (let i = 0; i < tiles.length; i++) {
     let tile = tiles[i];
-    let product = preprocessProduct(tile);
+    let product = preprocessProduct(tile, categories);
 
     products.push(product);
   }
@@ -59,17 +59,18 @@ function preprocessProducts(productsData) {
   return products;
 }
 
-function preprocessProduct(tile) {
+function preprocessProduct(tile, categories) {
   let data = tile.data;
   let price = Math.floor(data.price.normal * 100);
   let salePrice = Math.floor(data.price.sale * 100);
+  let articleGroupIds = data.articleGroupIds;
 
   let product = new Product();
 
   product.identifier = data.articleId;
   product.title = data.name;
   product.slug = data.slug;
-  product.categoryIdentifiers = data.articleGroupIds;
+  product.categoryIdentifiers = articleGroupIds;
   product.brand = data.brand;
   product.imageUrl = getImageUrl(data);
   product.amount = data.grammage;
@@ -82,9 +83,22 @@ function preprocessProduct(tile) {
   product.details.recommendedProductIds = data.recommendationArticleIds;
   product.description = data.description;
 
+  checkCategories(articleGroupIds, categories);
+
   product.checkFormat(product);
 
   return product;
+}
+
+function checkCategories(articleGroupIds, categories) {
+  for (let i = 0; i < articleGroupIds.length; i++) {
+    let id = articleGroupIds[i];
+    let cat = categories[id];
+
+    if (!cat) {
+      Logger.error(`Product-Category not found: ${id}`);
+    }
+  }
 }
 
 function getPricePerUnit(data, price) {
@@ -223,51 +237,40 @@ function preprocessCategories(categoryData) {
 
   for (let i = 0; i < categoryData.length; i++) {
     let category = categoryData[i];
-    let categoryId = category.articleGroupId;
-    let subcategoryData = category.children;
-
-    categories[categoryId] = {
-      identifier: categoryId,
-      title: category.title,
-      slug: getSegmentFromUrl(category.url, 1),
-      subcategoryIdentifiers: [],
-    }
-
-    for (let j = 0; j < subcategoryData.length; j++) {
-      let subcategory = subcategoryData[j];
-      let subcategoryId = subcategory.articleGroupId;
-      let subsubcategoryData = subcategory.children;
-
-      categories[subcategoryId] = {
-        identifier: subcategoryId,
-        title: subcategory.title,
-        slug: getSegmentFromUrl(subcategory.url, 2),
-        subcategoryIdentifiers: [],
-      }
-
-      categories[categoryId].subcategoryIdentifiers.push(subcategoryId);
-
-      for (let k = 0; k < subsubcategoryData.length; k++) {
-        let subsubcategory = subsubcategoryData[k];
-        let subsubcategoryId = subsubcategory.articleGroupId;
-
-        categories[subsubcategoryId] = {
-          identifier: subsubcategoryId,
-          title: subsubcategory.title,
-          slug: getSegmentFromUrl(subsubcategory.url, 3),
-          subcategoryIdentifiers: [],
-        }
-
-        categories[subcategoryId].subcategoryIdentifiers.push(subsubcategoryId);
-      }
-    }
+    traverseCategories(categories, category);
   }
 
   return categories;
 }
 
-function getSegmentFromUrl(string, segment) {
-  return string.split("/")[segment];
+function traverseCategories(categories = {}, category) {
+  let categoryId = category.articleGroupId;
+  let subcategoryData = category.children;
+
+  categories[categoryId] = {
+    identifier: categoryId,
+    title: category.title,
+    slug: getSlugFromUrl(category.url),
+    subcategoryIdentifiers: [],
+  }
+
+  if (subcategoryData.length) {
+    for (let i = 0; i < subcategoryData.length; i++) {
+      let subcategory = subcategoryData[i];
+      categories[categoryId].subcategoryIdentifiers.push(subcategory.articleGroupId);
+
+      traverseCategories(categories, subcategory);
+    }
+  } else {
+    return categories;
+  }
+}
+
+function getSlugFromUrl(string) {
+  let segments = string.split("/");
+  let secondLast = segments.length - 2;
+
+  return segments[secondLast];
 }
 
 function fetchDataFromUrl(url) {
