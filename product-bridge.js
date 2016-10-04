@@ -27,7 +27,7 @@ function traverse(object) {
 }
 
 function isNotEmptyObject(operand) {
-  return operand && typeof(operand) === "object" && Object.keys(operand).length
+  return operand && typeof(operand) === "object" && Object.keys(operand).length;
 }
 
 function getTypeOf(operand) {

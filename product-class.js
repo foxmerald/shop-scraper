@@ -41,6 +41,7 @@ const validate = schema({
   "eanCode": [String, null],
   "similarProducts": [Array, null],
   "details": Object,
+  "rawData": Object,
 });
 
 var Logger = require("./log-bridge");
@@ -68,6 +69,7 @@ module.exports = class Product {
    * @param {string} eanCode
    * @param {array of strings} similarProducts
    * @param {object} details
+   * @param {object} rawData
    **/
 
   constructor() {
@@ -103,7 +105,8 @@ module.exports = class Product {
     /*{
     nutrition: "",
     ingredients: "",
-  }*/
+    }*/
+    this.rawData = {};
   }
 
   checkFormat(product) {

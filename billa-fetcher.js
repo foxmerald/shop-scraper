@@ -82,6 +82,7 @@ function preprocessProduct(tile, categories) {
   product.tags = getProductTags(data);
   product.details.recommendedProductIds = data.recommendationArticleIds;
   product.description = data.description;
+  product.rawData = data;
 
   checkCategories(articleGroupIds, categories);
 
