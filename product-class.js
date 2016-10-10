@@ -25,8 +25,7 @@ const validate = schema({
     "generalTags": Array,
     "shopTags": Array,
   },
-  "details": Object,
-  "rawData": String,
+  "details": Object
 });
 
 var Logger = require("./log-bridge");
@@ -63,7 +62,6 @@ module.exports = class Product {
       //ingredients: "",
       //...
     };
-    this.rawData = null;
   }
 
   checkFormat(product) {
