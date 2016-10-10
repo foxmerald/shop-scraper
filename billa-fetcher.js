@@ -87,7 +87,7 @@ function preprocessProduct(tile, categories) {
   product.details.recommendedProductIds = data.recommendationArticleIds;
   product.description = data.description;
 
-  product.rawData = data;
+  product.rawData = JSON.stringify(data);
 
   checkCategories(articleGroupIds, categories);
 
