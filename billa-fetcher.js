@@ -62,8 +62,8 @@ function preprocessProducts(productsData, categories) {
 function preprocessProduct(tile, categories) {
   let data = tile.data;
   let price = Math.floor(data.price.normal * 100);
-  let salePrice = Math.floor(data.price.sale * 100);
   let articleGroupIds = data.articleGroupIds;
+  let pricePerUnit = getPricePerUnit(data, price);
 
   let product = new Product();
 
@@ -74,14 +74,19 @@ function preprocessProduct(tile, categories) {
   product.brand = data.brand;
   product.imageUrl = getImageUrl(data);
   product.amount = data.grammage;
-  product.price = price;
-  product.salePrice = salePrice;
-  product.pricePerUnit = getPricePerUnit(data, price);
-  product.salePricePerUnit = getPricePerUnit(data, salePrice);
-  product.discount = getProductDiscount(data);
+
+  product.normalPrice.price = price;
+  product.normalPrice.pricePerUnit = pricePerUnit.price;
+  product.normalPrice.amount = pricePerUnit.amount;
+  product.normalPrice.unit = pricePerUnit.unit;
+  product.normalPrice.packaging = pricePerUnit.packaging;
+
+  product.sales = getProductSales(data, price, product);
+
   product.tags = getProductTags(data);
   product.details.recommendedProductIds = data.recommendationArticleIds;
   product.description = data.description;
+
   product.rawData = data;
 
   checkCategories(articleGroupIds, categories);
@@ -102,13 +107,68 @@ function checkCategories(articleGroupIds, categories) {
   }
 }
 
-function getPricePerUnit(data, price) {
-  const referenceAmount = 1;
+function getProductSales(data, normalPrice, product) {
+  let salePrice = Math.floor(data.price.sale * 100);
+  let sales = [];
 
+  if (salePrice === normalPrice) {
+    return sales;
+  }
+
+  let bulkDiscountPriceTypes = data.price.bulkDiscountPriceTypes;
+  let defaultPriceTypes = data.price.defaultPriceTypes;
+
+  let pricePerUnit = getPricePerUnit(data, salePrice);
+  let discount = getProductDiscount(data);
+
+  let sale = product.getSalesTemplate();
+
+  sale.price.price = salePrice;
+
+  sale.price.pricePerUnit = pricePerUnit.price;
+  sale.price.amount = pricePerUnit.amount;
+  sale.price.unit = pricePerUnit.unit;
+  sale.price.packaging = pricePerUnit.packaging;
+
+  if (Object.keys(discount).length) {
+    sale.type = discount.type;
+    sale.condition = discount.condition;
+    sale.information = discount.information;
+  } else {
+    sale.type = "sale";
+  }
+
+  sales.push(sale);
+
+  return sales;
+}
+
+function getProductDiscount(data) {
+  let discount = {};
+  let defaultPriceTypes = data.price.defaultPriceTypes;
+  let bulkDiscountPriceTypes = data.price.bulkDiscountPriceTypes;
+
+  if (!defaultPriceTypes.length && !bulkDiscountPriceTypes.length) {
+    return discount;
+  } else if (defaultPriceTypes.length > 1 && !bulkDiscountPriceTypes.length) {
+    discount.type = defaultPriceTypes[1];
+    discount.condition = defaultPriceTypes[0];
+  } else {
+    discount.type = defaultPriceTypes[0];
+    discount.condition = bulkDiscountPriceTypes[0];
+  }
+
+  discount.information = data.price.priceAdditionalInfo.vptxt;
+
+  return discount;
+}
+
+function getPricePerUnit(data, price) {
   let grammageSplit = data.grammage.split(" ");
   let amount = parseFloat(grammageSplit[0]);
   let unit = grammageSplit[1];
   let packageType = grammageSplit[2];
+  let referenceAmount = 1;
 
   switch (unit) {
     case "Milliliter":
@@ -128,36 +188,22 @@ function getPricePerUnit(data, price) {
   }
 
   let unitMultiplicator = referenceAmount / amount;
+  let pricePerUnit = price * unitMultiplicator;
 
-  let pricePerUnit = {
+  // if pricePerUnit is below 1 cent, multiply price & amount by 10
+  while (pricePerUnit < 1) {
+    pricePerUnit = pricePerUnit * 10;
+    referenceAmount = referenceAmount * 10;
+  }
+
+  let pricePerUnitInfo = {
     amount: referenceAmount,
     unit: unit,
-    packageType: packageType,
-    price: Math.round(price * unitMultiplicator),
+    packaging: packageType,
+    price: Math.round(pricePerUnit),
   };
 
-  return pricePerUnit;
-}
-
-function getProductDiscount(data) {
-  let defaultPriceTypes = data.price.defaultPriceTypes;
-  let bulkDiscountPriceTypes = data.price.bulkDiscountPriceTypes;
-
-  if (!defaultPriceTypes.length && !bulkDiscountPriceTypes.length) {
-    return null;
-  }
-
-  if (!defaultPriceTypes.length) {
-    defaultPriceTypes.push("AKTION");
-  }
-
-  let discount = {
-    types: defaultPriceTypes,
-    conditions: bulkDiscountPriceTypes,
-    additionalInfo: data.price.priceAdditionalInfo.vptxt,
-  };
-
-  return discount;
+  return pricePerUnitInfo;
 }
 
 function getImageUrl(data) {
@@ -217,7 +263,7 @@ function getProductTags(data) {
 
   // check if online-shop only
   if (data.vtcOnly) {
-    generalTags.push("online-shop only");
+    shopTags.push("vorteilscard only");
   }
 
   // check if on sale
@@ -255,7 +301,7 @@ function traverseCategories(categories = {}, category) {
     subcategoryIdentifiers: [],
   }
 
-  if (subcategoryData.length) {
+  if (subcategoryData && subcategoryData.length) {
     for (let i = 0; i < subcategoryData.length; i++) {
       let subcategory = subcategoryData[i];
       categories[categoryId].subcategoryIdentifiers.push(subcategory.articleGroupId);

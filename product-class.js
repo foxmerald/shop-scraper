@@ -1,5 +1,6 @@
 "use strict";
 
+const util = require("util");
 const schema = require("js-schema");
 const validate = schema({
   "key": [Number, null],
@@ -11,35 +12,19 @@ const validate = schema({
   "categoryIdentifiers": Array,
   "imageUrl": [String, null],
   "brand": [String, null],
-  "price": Number,
-  "salePrice": [Number, null],
-  "pricePerUnit": {
+  "normalPrice": {
+    "price": Number,
+    "pricePerUnit": Number,
     "amount": Number,
     "unit": String,
-    "packageType": [String, null],
-    "price": Number,
+    "packaging": [String, null],
   },
-  "salePricePerUnit": [{
-    "amount": Number,
-    "unit": String,
-    "packageType": [String, null],
-    "price": Number,
-  }, null],
+  "sales": Array,
   "amount": String,
-  "discount": [{
-    "types": Array,
-    "conditions": Array,
-    "additionalInfo": [String, null],
-    "?fromTimestamp": Number,
-    "?toTimestamp": Number,
-  }, null],
   "tags": {
     "generalTags": Array,
     "shopTags": Array,
   },
-  "description": [String, null],
-  "eanCode": [String, null],
-  "similarProducts": [Array, null],
   "details": Object,
   "rawData": Object,
 });
@@ -47,31 +32,6 @@ const validate = schema({
 var Logger = require("./log-bridge");
 
 module.exports = class Product {
-  /**
-   * @param {object} product An object containing infos of a product
-   * @param {number} key
-   * @param {number} shopDataKey
-   * @param {string} identifier
-   * @param {string} slug
-   * @param {string} title
-   * @param {array of numbers} categoryKeys
-   * @param {array of strings} categoryIdentifiers
-   * @param {string} imageUrl
-   * @param {string} brand
-   * @param {number} price
-   * @param {number} salePrice
-   * @param {object} pricePerUnit
-   * @param {object} salePricePerUnit
-   * @param {string} amount
-   * @param {object} discount
-   * @param {string} description
-   * @param {object} tags
-   * @param {string} eanCode
-   * @param {array of strings} similarProducts
-   * @param {object} details
-   * @param {object} rawData
-   **/
-
   constructor() {
     this.key = null;
     this.shopDataKey = null;
@@ -82,30 +42,27 @@ module.exports = class Product {
     this.categoryIdentifiers = []; // array of the shop's categoryIds
     this.imageUrl = null;
     this.brand = null;
-    this.price = null; // long
-    this.salePrice = null; // long
-    this.pricePerUnit = {};
-    this.salePricePerUnit = {};
+    this.normalPrice = {
+      price: null,
+      pricePerUnit: null,
+      amount: null,
+      unit: null,
+      packaging: null,
+    };
     this.amount = null;
-    this.discount = []; // array of objects with type e.g. "Aktion" and condition e.g. "Multipack, ab 2 Stück"
-    /*{
-      type: null,
-      condition: null,
-      fromTimestamp: null,
-      toTimestamp: null
-    }*/
-    this.description = null; // string
+    this.sales = []; // array of objects: see salesTemplate
     this.tags = {
       generalTags: [], // array of strings e.g. frozen, bio, ...
       shopTags: [] // array of strings (own special tags used by shops e.g. Billa Tiefpreis)
     };
-    this.eanCode = null;
-    this.similarProducts = []; // array of strings, containing productIds
-    this.details = {}; // object for future details e.g. color or fabric for clothes?
-    /*{
-    nutrition: "",
-    ingredients: "",
-    }*/
+    this.details = {
+      //eanCode: "",
+      //description: "", // string
+      //vatCode: null, // number
+      //nutrition: "",
+      //ingredients: "",
+      //...
+    };
     this.rawData = {};
   }
 
@@ -113,10 +70,29 @@ module.exports = class Product {
     var validProduct = validate(product);
 
     if (!validProduct) {
-      Logger.error("product format error:");
-      validate.errors(product);
+      let validationErrors = util.inspect(validate.errors(product));
+      Logger.error(`product format error: ${validationErrors}`);
     }
 
     return validProduct;
+  }
+
+  getSalesTemplate() {
+    let saleTemplate = {
+      price: {
+        price: null,
+        pricePerUnit: null,
+        amount: null,
+        unit: null,
+        packaging: null,
+      },
+      type: null,
+      condition: null,
+      information: null,
+      fromTimestamp: null,
+      toTimestamp: null,
+    }
+
+    return saleTemplate;
   }
 };
