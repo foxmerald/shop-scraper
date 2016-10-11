@@ -72,7 +72,6 @@ function preprocessProduct(tile, categories) {
   product.slug = data.slug;
   product.categoryIdentifiers = articleGroupIds;
   product.brand = data.brand;
-  product.imageUrl = getImageUrl(data);
   product.amount = data.grammage;
 
   product.normalPrice.price = price;
@@ -85,7 +84,8 @@ function preprocessProduct(tile, categories) {
 
   product.tags = getProductTags(data);
   product.details.recommendedProductIds = data.recommendationArticleIds;
-  product.description = data.description;
+  product.details.imageUrl = getImageUrl(data);
+  product.details.description = data.description;
 
   checkCategories(articleGroupIds, categories);
 
