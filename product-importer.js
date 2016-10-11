@@ -4,8 +4,8 @@ const request = require("request");
 const deferred = require("deferred");
 const Logger = require("./log-bridge");
 
-const serverUrl = "http://localhost:7000";
-// const serverUrl = "https://zuper-preise-backend.appspot.com";
+// const serverUrl = "http://localhost:7000";
+const serverUrl = "https://zuper-preise-backend.appspot.com";
 
 const ServerBridge = (function() {
   function pollJob(jobUrl, jobKey, future) {
