@@ -288,7 +288,7 @@ function preprocessCategories(categoryData) {
   return categories;
 }
 
-function traverseCategories(categories = {}, category) {
+function traverseCategories(categories = {}, category, topcategoryId = null) {
   let categoryId = category.articleGroupId;
   let subcategoryData = category.children;
 
@@ -296,7 +296,8 @@ function traverseCategories(categories = {}, category) {
     identifier: categoryId,
     title: category.title,
     slug: getSlugFromUrl(category.url),
-    subcategoryIdentifiers: [],
+    childIdentifiers: [],
+    parentIdentifier: topcategoryId,
   }
 
   if (subcategoryData && subcategoryData.length) {
@@ -304,7 +305,7 @@ function traverseCategories(categories = {}, category) {
       let subcategory = subcategoryData[i];
       categories[categoryId].subcategoryIdentifiers.push(subcategory.articleGroupId);
 
-      traverseCategories(categories, subcategory);
+      traverseCategories(categories, subcategory, categoryId);
     }
   } else {
     return categories;
