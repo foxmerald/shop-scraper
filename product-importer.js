@@ -1,10 +1,11 @@
 "use strict";
 
-const requestPromise = require("request-promise");
+const request = require("request");
 const deferred = require("deferred");
 const Logger = require("./log-bridge");
 
 const serverUrl = "http://localhost:7000";
+// const serverUrl = "https://zuper-preise-backend.appspot.com";
 
 const ServerBridge = (function() {
   function pollJob(jobUrl, jobKey, future) {
@@ -21,20 +22,19 @@ const ServerBridge = (function() {
       }
     };
 
-    function retryPolling() {
+    var retryPolling = function() {
       setTimeout(function() {
         pollJob(jobUrl, jobKey, future);
       }, 500);
-    }
+    };
 
-    var promise = requestPromise(requestOptions);
-    promise.then(function(job) {
-      if (job.closedTimestamp > 0) {
-        future.resolve(job);
+    request(requestOptions, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        future.resolve(body);
       } else {
         retryPolling();
       }
-    }).catch(retryPolling);
+    });
 
     return future.promise;
   }
@@ -42,10 +42,16 @@ const ServerBridge = (function() {
   function requestJob(requestOptions, jobUrl) {
     var future = deferred();
 
-    var promise = requestPromise(requestOptions);
-    promise.then(function(job) {
-      var jobPromise = pollJob(jobUrl, job.key);
-      future.resolve(jobPromise);
+    request(requestOptions, (error, response, body) => {
+      if (!error && response.statusCode === 200) {
+        var job = body;
+
+        var jobPromise = pollJob(jobUrl, job.key);
+        future.resolve(jobPromise);
+      } else {
+        Logger.error(`error from ${url}: ${error}`);
+        future.reject(error);
+      }
     });
 
     return future.promise;
@@ -97,7 +103,7 @@ var CategoryBridge = (function() {
       }
     };
 
-    let promise = requestPromise(options, (error, response, body) => {
+    request(options, (error, response, body) => {
       if (!error && response.statusCode === 200) {
         Logger.log(`import started - data fetched from ${url}: ${body}`);
         future.resolve(body);
@@ -127,7 +133,7 @@ var CategoryBridge = (function() {
       }
     };
 
-    let promise = requestPromise(options, (error, response, body) => {
+    request(options, (error, response, body) => {
       if (!error && response.statusCode === 200) {
         Logger.log(`import finished - data fetched from ${url}: ${body}`);
         future.resolve(body);
@@ -149,7 +155,15 @@ var CategoryBridge = (function() {
 })();
 
 var ProductBridge = (function() {
-  function saveProductBatch(shopDataKey, products) {
+  function saveProductBatch(previousPromise, shopDataKey, products) {
+    if (previousPromise) {
+      previousPromise.done(function() {
+        saveProductBatch(null, shopDataKey, products);
+      });
+
+      return;
+    }
+
     let requestUrl = serverUrl + "/import/products";
 
     let requestOptions = {
@@ -175,11 +189,14 @@ var ProductBridge = (function() {
     var future = deferred();
     var productsPromises = [];
 
+    var previousPromise;
     while (products.length) {
       let productsStack = products.splice(0, 1000);
-      let promise = saveProductBatch(shopDataKey, productsStack);
+      let promise = saveProductBatch(previousPromise, shopDataKey, productsStack);
 
       productsPromises.push(promise);
+
+      previousPromise = promise;
     }
 
     Promise.all(productsPromises).then(result => {
@@ -208,7 +225,7 @@ var ProductBridge = (function() {
       }
     };
 
-    let promise = requestPromise(options, (error, response, body) => {
+    request(options, (error, response, body) => {
       if (!error && response.statusCode === 200) {
         Logger.log(`import started - data fetched from ${url}: ${body}`);
         future.resolve(body);
@@ -238,7 +255,7 @@ var ProductBridge = (function() {
       }
     };
 
-    let promise = requestPromise(options, (error, response, body) => {
+    request(options, (error, response, body) => {
       if (!error && response.statusCode === 200) {
         Logger.log(`import finished - data fetched from ${url}: ${body}`);
         future.resolve(body);
@@ -258,46 +275,6 @@ var ProductBridge = (function() {
 
   return bridge;
 })();
-
-/*
-var shopDataKey = 1;
-
-var categories = [{
-  identifier: "category-3",
-  name: "milchprodukte"
-}, {
-  identifier: "category-2",
-  name: "bananenprodukte",
-  subcategoryIdentifiers: ["category-3"]
-}];
-
-var categoriesPromise = CategoryBridge.saveCategories(shopDataKey, categories);
-categoriesPromise.then(function(job) {
-  console.log("categories:");
-  console.log(JSON.parse(job.payload));
-
-  var products = [{
-    identifier: "product-3",
-    name: "milch",
-    categoryIdentifiers: ["category-3"],
-    price: 100
-  }, {
-    identifier: "product-2",
-    name: "banane",
-    categoryIdentifiers: ["category-2"],
-    price: 100,
-    salePrice: 50
-  }];
-
-  var productsPromise = ProductBridge.saveProducts(shopDataKey, products);
-  productsPromise.then(function(products) {
-    console.log("products:");
-    console.log(JSON.parse(job.payload));
-
-    console.log("done marie :)");
-  });
-});
-*/
 
 module.exports = {
   ProductBridge: ProductBridge,
