@@ -195,7 +195,7 @@ var ProductBridge = (function() {
 
     var previousPromise;
     while (products.length) {
-      let productsStack = products.splice(0, 1000);
+      let productsStack = products.splice(0, 500);
       let promise = saveProductBatch(previousPromise, shopDataKey, productsStack);
 
       productsPromises.push(promise);
