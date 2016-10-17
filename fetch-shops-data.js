@@ -18,11 +18,9 @@ const shopDataKeys = {
 
 Logger.log("start fetching data");
 
+// BILLA
 var billaFetcher = require("./billa-fetcher");
-//var merkurFetcher = require("./merkur-fetcher");
-
 var billaPromise = billaFetcher.fetchData();
-//var merkurPromise = merkurFetcher.fetchData();
 
 billaPromise.then(data => {
   Logger.log("send billa data");
@@ -30,6 +28,22 @@ billaPromise.then(data => {
   var categoriesPromise = sendCategoriesData(shopDataKeys.billa, data.categories);
   categoriesPromise.then(function() {
     var productsPromise = sendProductsData(shopDataKeys.billa, data.products);
+    productsPromise.catch(Logger.error);
+  }).catch(Logger.error);
+}).catch(Logger.error);
+
+// MERKUR
+var merkurFetcher = require("./merkur-fetcher");
+var merkurPromise = merkurFetcher.fetchData();
+
+merkurPromise.then(data => {
+  debugger;
+  Logger.log("send merkur data");
+
+  var categoriesPromise = sendCategoriesData(shopDataKeys.merkur, data.categories);
+  categoriesPromise.then(function() {
+    debugger;
+    var productsPromise = sendProductsData(shopDataKeys.merkur, data.products);
     productsPromise.catch(Logger.error);
   }).catch(Logger.error);
 }).catch(Logger.error);

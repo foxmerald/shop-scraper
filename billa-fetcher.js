@@ -6,7 +6,7 @@ const rp = require('request-promise');
 const deferred = require("deferred");
 
 var Promise = require("bluebird");
-var Product = require("./product-class");
+var ProductBridge = require("./product-bridge");
 var Logger = require("./log-bridge");
 
 function fetchData() {
@@ -65,7 +65,7 @@ function preprocessProduct(tile, categories) {
   let articleGroupIds = data.articleGroupIds;
   let pricePerUnit = getPricePerUnit(data, price);
 
-  let product = new Product();
+  let product = new ProductBridge.Product();
 
   product.identifier = data.articleId;
   product.title = data.name;
@@ -119,7 +119,7 @@ function getProductSales(data, normalPrice, product) {
   let pricePerUnit = getPricePerUnit(data, salePrice);
   let discount = getProductDiscount(data);
 
-  let sale = product.getSalesTemplate();
+  let sale = product.salesTemplate();
 
   sale.price.price = salePrice;
 
@@ -210,6 +210,7 @@ function getImageUrl(data) {
 }
 
 function getProductTags(data) {
+  //var translator = ProductBridge.tagsTranslator();
   const translator = {
     "s_bio": "organic",
     "s_marke": "brand",

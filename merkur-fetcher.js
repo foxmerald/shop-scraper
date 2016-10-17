@@ -2,202 +2,466 @@
 
 const request = require("request");
 const util = require("util");
+const rp = require('request-promise');
+const deferred = require("deferred");
+const moment = require("moment");
 
 var Promise = require("bluebird");
-var Product = require("./product-class");
+var ProductBridge = require("./product-bridge");
+var Logger = require("./log-bridge");
+var TestDataBridge = require("./test-data-bridge");
 
-module.exports = {
-  fetchData: () => {
-    var categoriesPromise = fetchCategories();
+function fetchData() {
+  var future = deferred();
+  var testDataPromise = TestDataBridge.loadFile("merkur");
 
-    categoriesPromise.then((categoriesData) => {
-      var categories = preprocessCategories(categoriesData);
-      var categoryIds = Object.keys(categories);
-      var categoryUrls = urls;
+  testDataPromise.then((testData) => {
+    let productsData = testData.products;
+    let categoriesData = testData.categories;
 
-      return fetchProducts(categoryIds).then(result => {
-        var data = {
-          products: result,
-          categories: categories
-        }
+    let categories = preprocessCategories(categoriesData);
+    let products = preprocessProducts(productsData);
 
-        debugger;
+    let categoriesList = [];
+    for (var category in categories) {
+      categoriesList.push(categories[category]);
+    }
 
-        return data;
-      }).catch(error => {
-        console.error("Error: " + error);
-      });
-    }).catch((error) => {
-      console.error("Error: " + error);
+    let data = {
+      categories: categoriesList,
+      products: products,
+    }
+
+    debugger;
+
+    return future.resolve(data);
+  }).catch(error => {
+    if (error.code === "ENOENT") {
+      Logger.log("No Test-Data-File found. Fetching new data.");
+
+      return fetchNewData();
+    } else {
+      Logger.error("Error: " + error);
+
+      return future.reject();
+    }
+  });
+
+  return future.promise;
+}
+
+function fetchNewData() {
+  var future = deferred();
+  var categoriesPromise = fetchCategories();
+
+  categoriesPromise.then((categoriesData) => {
+    let categories = preprocessCategories(categoriesData);
+    let urls = [];
+
+    for (let category in categories) {
+      urls.push(categories[category].url);
+    }
+
+    // append further categories like e.g. store brand or vegan
+    urls = appendAdditionalCategories(urls);
+
+    let productsPromise = fetchProducts(urls);
+    productsPromise.then(result => {
+      // save fetched Data to test-data file
+      let rawData = {
+        categories: categoriesData,
+        products: result,
+      };
+
+      TestDataBridge.saveFile("merkur", rawData);
+
+      let products = preprocessProducts(result);
+
+      let categoriesList = [];
+      for (var category in categories) {
+        categoriesList.push(categories[category]);
+      }
+
+      let data = {
+        categories: categoriesList,
+        products: products,
+      };
+
+      return future.resolve(data);
+    }).catch(error => {
+      Logger.error("Error: " + error);
+      future.reject(error);
     });
+  }).catch(error => {
+    Logger.error("Error: " + error);
+    future.reject(error);
+  });
+
+  return future.promise;
+}
+
+function appendAdditionalCategories(urls) {
+  const additionalCategories = ["immer-gut-tiere", "merkurimmergut", "laktosefrei-category", "milchalternativen", "clever-category", "clever-milchprodukte", "alnatura-baby", "alnatura-category", "vegane-produkte", "vega-vita"];
+
+  for (let i = 0; i < additionalCategories.length; i++) {
+    let additionalCategory = additionalCategories[i];
+    let additionalUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${additionalCategory}`;
+
+    if (!urls.includes(additionalUrl)) {
+      urls.push(additionalUrl);
+    }
   }
-};
+
+  return urls;
+}
+
+function preprocessProducts(result) {
+  let productsDataRaw = preprocessProductsDataRaw(result);
+  let productsData = filterOutDuplicates(productsDataRaw);
+  let products = preprocessProductsData(productsData);
+
+  return products;
+}
+
+function preprocessProductsData(productsData) {
+  let products = [];
+
+  for (let element in productsData) {
+    let tile = productsData[element];
+    let product = preprocessProduct(tile);
+    products.push(product);
+  }
+
+  return products;
+}
+
+function preprocessProduct(tile) {
+  let price = getProductPrice(tile);
+  let pricePerUnit = getPricePerUnit(tile, price);
+
+  let product = new ProductBridge.Product();
+
+  product.identifier = tile.sku;
+  product.title = tile.name;
+  product.slug = tile.slug;
+  product.categoryIdentifiers = tile.categoryIds;
+  product.brand = tile.brand;
+  product.amount = tile.pieceDescription;
+
+  product.normalPrice.price = price;
+  product.normalPrice.pricePerUnit = pricePerUnit.price;
+  product.normalPrice.amount = pricePerUnit.amount;
+  product.normalPrice.unit = pricePerUnit.unit;
+  product.normalPrice.packaging = pricePerUnit.packaging;
+
+  product.sales = getProductSales(product, tile);
+
+  product.tags = getProductTags(tile);
+
+  product.details.description = tile.descriptionShort;
+  product.details.descriptionDetail = tile.descriptionLong;
+  product.details.imageUrl = tile.image;
+  product.details.weightPerPiece = tile.weightPerPiece;
+  product.details.vatCode = tile.vatCode;
+  product.details.origin = tile.origin;
+
+  product.checkFormat(product);
+
+  return product;
+}
+
+function getProductTags(tile) {
+  let tags = {
+    generalTags: [],
+    shopTags: [],
+  };
+
+  /*
+  if (tile.sealOfQuality) {
+    for (let i = 0; i < tile.sealOfQuality.length; i++) {
+      console.log(tile.sealOfQuality[i].key + " - " + tile.sealOfQuality[i].label);
+    }
+  }
+
+  if (tile.personalPreferences) {
+    for (let i = 0; i < tile.personalPreferences.length; i++) {
+      console.log(tile.personalPreferences[i].key + " - " + tile.personalPreferences[i].label);
+    }
+  }
+  */
+
+  return tags;
+}
+
+function getProductPrice(tile) {
+  let crossed = tile.price.crossed;
+
+  if (crossed) {
+    return crossed;
+  } else {
+    return tile.price.amount;
+  }
+}
+
+function getProductSales(product, tile) {
+  let price = tile.price;
+  let sales = [];
+
+  if (!price.discount) {
+    return sales;
+  }
+
+  let discount = price.discount;
+  let salePrice = price.amount;
+  let pricePerUnit = getPricePerUnit(tile, salePrice);
+
+  let sale = product.salesTemplate();
+
+  sale.price.price = salePrice;
+
+  sale.price.pricePerUnit = pricePerUnit.price;
+  sale.price.amount = pricePerUnit.amount;
+  sale.price.unit = pricePerUnit.unit;
+  sale.price.packaging = pricePerUnit.packaging;
+
+  sale.type = discount.text;
+  sale.condition = discount.condition;
+
+  sales.push(sale);
+
+  return sales;
+}
+
+function getPricePerUnit(tile, price) {
+  let pricePerUnitInfo = {};
+
+  if (!tile.pieceDescription) {
+    return pricePerUnitInfo;
+  }
+
+  let referenceAmount = 1;
+  let pieceDescriptionSplit = tile.pieceDescription.split(" ");
+  let amount;
+  let unit;
+  let packaging;
+
+  if (pieceDescriptionSplit.length <= 3) {
+    amount = parseFloat(pieceDescriptionSplit[0]);
+    unit = pieceDescriptionSplit[1];
+    packaging = pieceDescriptionSplit[2];
+  } else {
+    amount = parseFloat(pieceDescriptionSplit[3]);
+    unit = pieceDescriptionSplit[4];
+  }
+
+  switch (unit) {
+    case "Milliliter":
+      amount = amount / 1000;
+      unit = "Liter";
+      break;
+    case "Gramm":
+      amount = amount / 1000;
+      unit = "Kilogramm";
+      break;
+    case "Kubiczentimeter":
+      amount = amount / 1000;
+      unit = "Liter";
+      break;
+    case "Zentimeter":
+      amount = amount / 100;
+      unit = "Meter";
+      break;
+    default:
+      break;
+  }
+
+  let unitMultiplicator = referenceAmount / amount;
+  let pricePerUnit = price * unitMultiplicator;
+
+  // if pricePerUnit is below 1 cent, multiply price & amount by 10
+  while (pricePerUnit < 1) {
+    pricePerUnit = pricePerUnit * 10;
+    referenceAmount = referenceAmount * 10;
+  }
+
+  if (unit === packaging) {
+    packaging = null;
+  }
+
+  pricePerUnitInfo.amount = referenceAmount;
+  pricePerUnitInfo.unit = unit;
+  pricePerUnitInfo.packaging = packaging;
+  pricePerUnitInfo.price = Math.round(pricePerUnit);
+
+  return pricePerUnitInfo;
+}
+
+function filterOutDuplicates(productsDataRaw) {
+  let productsData = {};
+
+  for (let i = 0; i < productsDataRaw.length; i++) {
+    let product = productsDataRaw[i];
+    let productId = product.sku;
+
+    if (!productsData[productId]) {
+      product.categoryIds = [];
+      product.categoryIds.push(product.categoryId);
+      productsData[productId] = product;
+
+      continue;
+    }
+
+    let categoryIds = productsData[productId].categoryIds;
+    let categoryId = product.categoryId;
+
+    if (!categoryIds.includes(categoryId)) {
+      categoryIds.push(categoryId);
+    }
+
+    Object.assign(productsData[productId], product);
+  }
+
+  return productsData;
+}
+
+function preprocessProductsDataRaw(result) {
+  let productsData = [];
+
+  for (let i = 0; i < result.length; i++) {
+    let categoryData = result[i];
+    let categoryId = categoryData.category.externalId;
+    let products = categoryData.products;
+
+    for (let j = 0; j < products.length; j++) {
+      let product = products[j];
+      product.categoryId = categoryId;
+
+      productsData.push(product);
+    }
+  }
+
+  return productsData;
+}
 
 function preprocessCategories(data) {
-  var dataGroups = data.children;
-  var categories = {};
-  var urls = [];
-  var mainCategories;
+  let dataGroups = data.children;
+  let categoriesData;
+  let categories = {};
 
   for (let i = 0; i < dataGroups.length; i++) {
     let dataGroup = dataGroups[i];
 
     if (dataGroup.slug === "/shop/") {
-      mainCategories = dataGroup.children;
+      categoriesData = dataGroup.children;
       break;
     }
   }
 
-  for (let i = 0; i < mainCategories.length; i++) {
-    var cat = mainCategories[i];
-    var catId = getCategoryId(cat.slug);
-    var catUrl = getCategoryUrl(cat.slug, catId);
-    var topcategories = cat.children;
-
-    categories[catId] = {
-      name: cat.name,
-      id: cat.externalId,
-      url: catUrl,
-      subcategories: [], // TODO add children
-    }
-
-    urls.push(catUrl);
-
-    if (!topcategories) {
-      continue;
-    }
-
-    for (let j = 0; j < topcategories.length; j++) {
-      var topcat = topcategories[j];
-      var topcatId = getCategoryId(topcat.slug);
-      var topcatUrl = getCategoryUrl(topcat.slug, topcatId);
-      var subcategories = topcat.children;
-
-      categories[topcatId] = {
-        name: topcat.name,
-        id: topcat.externalId,
-        url: topcatUrl,
-        subcategories: [], // TODO add children
-      }
-
-      urls.push(topcatUrl);
-
-      if (!subcategories) {
-        continue;
-      }
-
-      for (let k = 0; k < subcategories.length; k++) {
-        var subcat = subcategories[k];
-        var subcatId = getCategoryId(subcat.slug);
-        var subcatUrl = getCategoryUrl(subcat.slug, subcatId);
-        var subsubcategories = subcat.children;
-
-        categories[subcatId] = {
-          name: subcat.name,
-          id: subcat.externalId,
-          url: subcatUrl,
-          subcategories: [], // TODO add children
-        }
-
-        urls.push(subcatUrl);
-
-        if (!subsubcategories) {
-          continue;
-        }
-
-        for (let l = 0; l < subsubcategories.length; l++) {
-          var subsubcat = subsubcategories[l];
-          var subsubcatId = getCategoryId(subsubcat.slug);
-          var subsubcatUrl = getCategoryUrl(subsubcat.slug, subsubcatId);
-
-          categories[subsubcatId] = {
-            name: subsubcat.name,
-            id: subsubcat.externalId,
-            url: subsubcatUrl,
-            subcategories: [],
-          }
-
-          urls.push(subsubcatUrl);
-        }
-      }
-    }
+  for (let i = 0; i < categoriesData.length; i++) {
+    let category = categoriesData[i];
+    traverseCategories(categories, category);
   }
-
-  var categoriesData = {
-    categories: categories,
-    urls: urls
-  }
-
-  debugger;
 
   return categories;
 }
 
-function getCategoryUrl(slug, id) {
-  let categoryUrl;
+function traverseCategories(categories = {}, category, topcategoryId = null) {
+  let categoryId = category.externalId;
+  let subcategoryData = category.children;
+  let slug = getSlugFromUrl(category.slug);
 
-  if (slug.indexOf("aktion-und-promotion") >= 0) {
-    debugger;
-    categoryUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${id}`;
-  } else {
-    categoryUrl = `https://www.merkurmarkt.at/api/shop/product-overview/${id}`;
+  if (!categoryId) {
+    categoryId = slug;
   }
 
-  https: //www.merkurmarkt.at/api/shop/articles/category/zitronen-7707/08-833618?pageSize=35&timestamp=1474553606808
+  categories[categoryId] = {
+    identifier: categoryId,
+    title: category.name,
+    slug: slug,
+    url: getCategoryUrl(category.slug, slug),
+    childIdentifiers: [],
+    parentIdentifier: topcategoryId,
+  };
 
-    return categoryUrl;
+  if (subcategoryData && subcategoryData.length) {
+    for (let i = 0; i < subcategoryData.length; i++) {
+      let subcategory = subcategoryData[i];
+      categories[categoryId].childIdentifiers.push(subcategory.externalId);
+
+      traverseCategories(categories, subcategory, categoryId);
+    }
+  } else {
+    return categories;
+  }
 }
 
-function getCategoryId(slug) {
-  let segments = slug.split("/");
+function getSlugFromUrl(string) {
+  let segments = string.split("/");
+  let slug = segments[segments.length - 1];
 
-  let lastElement = segments[segments.length - 1];
-  let secondLastElement = segments[segments.length - 2];
-  let categoryId = lastElement || secondLastElement;
+  if (!slug) {
+    slug = segments[segments.length - 2];
+  }
 
-  return categoryId;
+  return slug;
 }
 
-function fetchProducts(categoryIds, results = [], pageNr = 0) {
-  if (!categoryIds.length || results.length > 50) { //TODO: remove results.length > 50
-    debugger;
+function getCategoryUrl(categorySlug, slug) {
+  let categoryUrl;
+  let translator = {
+    "merkur-immer-gut": "merkurimmergut",
+    "vegan": "vegane-produkte",
+  };
+
+  if (Object.keys(translator).includes(slug)) {
+    categoryUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${translator[slug]}`;
+  } else if (categorySlug.includes("aktion-und-promotion")) {
+    categoryUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${slug}-category`;
+  } else {
+    categoryUrl = `https://www.merkurmarkt.at/api/shop/product-overview/${slug}`;
+  }
+
+  return categoryUrl;
+}
+
+function fetchProducts(categoryUrls, results = [], pageNr = 0) {
+  if (!categoryUrls.length /*|| results.length > 20*/ ) { //TODO: remove results.length
     return results;
   }
 
-  var categoryId = categoryIds.shift();
+  let categoryUrl = categoryUrls.shift();
+  let nowTimestamp = moment().unix() * 1000;
 
-  let url = `${categoryId}?pageSize=500&page=${pageNr}`;
-  //let url = `https://www.merkurmarkt.at/api/shop/product-overview/${categoryId}?pageSize=500&page=${pageNr}`;
-  //"https://www.merkurmarkt.at/api/shop/articles/category/grill-huhn?pageSize=500&page=0"
-  //"https://www.merkurmarkt.at/api/shop/articles/category/grill-huhn?pageSize=500&timestamp=1474481151545"
-
+  let url = `${categoryUrl}?pageSize=500&page=${pageNr}&timestamp=${nowTimestamp}`;
   let options = {
     url: url,
     json: true
   };
 
-  var insges = results.length + categoryIds.length + 1;
-  var current = results.length;
-  console.log(`${Math.floor(current/insges*100)}% ${current}/${insges} - ${categoryId}: `);
+  // show status/progress log
+  let insges = results.length + categoryUrls.length + 1;
+  let current = results.length;
+  Logger.log(`${Math.floor(current/insges*100)}% ${current}/${insges} - ${url}`);
 
   let promise = new Promise((resolve, reject) => {
     request(options, (error, response, body) => {
       if (!error && response.statusCode === 200) {
-
-        console.log(body);
+        Logger.log(`Success: ${categoryUrl} (Page ${pageNr}, ${body.count} products)`);
         results.push(body);
 
-        if (body.total !== body.count + body.offset) {
-          categoryIds.unshift(categoryId);
-          resolve(fetchProducts(categoryIds, results, pageNr + 1));
+        let hasSeveralProductPages = body.total !== body.count + body.offset;
+        let isArticlesPage = url.includes("/articles/");
+
+        if (hasSeveralProductPages && !isArticlesPage) {
+          categoryUrls.unshift(categoryUrl);
+          resolve(fetchProducts(categoryUrls, results, pageNr + 1));
           return;
         }
       } else {
-        debugger;
-        console.error("Error - " + categoryId + ": " + error);
+        Logger.error("Error - " + categoryUrl + ": " + error);
       }
 
-      resolve(fetchProducts(categoryIds, results));
+      resolve(fetchProducts(categoryUrls, results));
     });
   });
 
@@ -205,21 +469,26 @@ function fetchProducts(categoryIds, results = [], pageNr = 0) {
 }
 
 function fetchCategories() {
+  let future = deferred();
+  let nowTimestamp = moment().unix() * 1000;
+
   let options = {
-    url: "https://www.merkurmarkt.at/api/nav/1467103900346/anon",
+    url: `https://www.merkurmarkt.at/api/nav/${nowTimestamp}/anon`,
     json: true
   };
 
-  let promise = new Promise((resolve, reject) => {
-    request(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        resolve(body);
-      } else {
-        console.error("Error: " + error);
-        reject(error);
-      }
-    });
+  let promise = request(options, (error, response, body) => {
+    if (!error && response.statusCode === 200) {
+      future.resolve(body);
+    } else {
+      Logger.error("Error: " + error);
+      future.reject(error);
+    }
   });
 
-  return promise;
+  return future.promise;
 }
+
+module.exports = {
+  fetchData: fetchData,
+};
