@@ -11,13 +11,13 @@ const validate = schema({
   "brand": [String, null],
   "normalPrice": {
     "price": Number,
-    "pricePerUnit": Number,
-    "amount": Number,
-    "unit": String,
+    "pricePerUnit": [Number, null],
+    "amount": [Number, null],
+    "unit": [String, null],
     "packaging": [String, null],
   },
   "sales": Array,
-  "amount": String,
+  "amount": [String, null],
   "tags": {
     "generalTags": Array,
     "shopTags": Array,

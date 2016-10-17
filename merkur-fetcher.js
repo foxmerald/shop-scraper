@@ -314,7 +314,7 @@ function filterOutDuplicates(productsDataRaw) {
     let categoryIds = productsData[productId].categoryIds;
     let categoryId = product.categoryId;
 
-    if (!categoryIds.includes(categoryId)) {
+    if (categoryId && !categoryIds.includes(categoryId)) {
       categoryIds.push(categoryId);
     }
 
