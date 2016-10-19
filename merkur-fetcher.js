@@ -423,7 +423,8 @@ function traverseCategories(categories = {}, category, topcategoryId = null) {
   if (subcategoryData && subcategoryData.length) {
     for (let i = 0; i < subcategoryData.length; i++) {
       let subcategory = subcategoryData[i];
-      categories[categoryId].childIdentifiers.push(subcategory.externalId);
+      let subcategoryId = subcategory.externalId || getSlugFromUrl(subcategory.slug);
+      categories[categoryId].childIdentifiers.push(subcategoryId);
 
       traverseCategories(categories, subcategory, categoryId);
     }
