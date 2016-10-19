@@ -18,40 +18,9 @@ const validate = schema({
   },
   "sales": Array,
   "amount": [String, null],
-  "tags": {
-    "generalTags": Array,
-    "shopTags": Array,
-  },
+  "tags": Object,
   "details": Object
 });
-const tagsTranslator = {
-  /*
-    "bio",
-    "s_bio",
-    "bio-austria",
-    "eu-bio",
-    "ama-bio": "organic",
-    "s_marke": "brand",
-    "s_gekuehlt": "cooled",
-    "s_tiefgek": "frozen",
-    "s_guetesie": "seal of quality",
-    "s_spezern": "special diet",
-    "s_herkunft",
-    "s_hkland": "country of origin",
-    "s_regio": "regional",
-    "s_new": "new",
-    "mengemin": "varying weight",
-    "fairtrade": "fairtrade",
-    "koffeinfrei": "decaffeinated",
-    "laktosefrei": "lactose-free",
-    "vegan",
-    "veganblume": "vegan",
-    "vegetarisch": "vegetarian",
-    "alkoholfrei": "alcohol-free",
-    "gentechnikfrei": "genetically unmodified",
-    "fairtrade": "fairtrade",
-  */
-};
 
 var Logger = require("./log-bridge");
 
@@ -72,10 +41,7 @@ class Product {
     };
     this.amount = null;
     this.sales = []; // array of objects: see salesTemplate
-    this.tags = {
-      generalTags: [], // array of strings e.g. frozen, bio, ...
-      shopTags: [] // array of strings (own special tags used by shops e.g. Billa Tiefpreis)
-    };
+    this.tags = {}; // object (e.g. "organic": "Bioprodukt", see tags-translator.js)
     this.details = {
       //imageUrl: null,
       //eanCode: "",
@@ -165,5 +131,4 @@ function getTypeOf(operand) {
 module.exports = {
   Product: Product,
   getDataSchema: getDataSchema,
-  tagsTranslator: tagsTranslator,
 };

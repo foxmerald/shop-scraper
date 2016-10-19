@@ -5,6 +5,8 @@ const util = require("util");
 const rp = require('request-promise');
 const deferred = require("deferred");
 
+const tagsTranslator = require("./tags-translator")();
+
 var Promise = require("bluebird");
 var ProductBridge = require("./product-bridge");
 var Logger = require("./log-bridge");
@@ -210,39 +212,23 @@ function getImageUrl(data) {
 }
 
 function getProductTags(data) {
-  //var translator = ProductBridge.tagsTranslator();
-  const translator = {
-    "s_bio": "organic",
-    "s_marke": "brand",
-    "s_gekuehlt": "cooled",
-    "s_tiefgek": "frozen",
-    "s_guetesie": "seal of quality",
-    "s_spezern": "special diet",
-    "s_herkunft": "country of origin",
-    "s_hkland": "country of origin",
-    "s_regio": "regional",
-    "s_new": "new",
-    "mengemin": "varying weight",
-  };
-
-  var attributes = data.attributes;
-  var priceTypes = data.vtcPrice.defaultPriceTypes;
-  var normalPrice = data.price.normal;
-  var salePrice = data.price.sale;
-  var generalTags = [];
-  var shopTags = [];
+  let tagsData = {};
+  let attributes = data.attributes;
+  let priceTypes = data.vtcPrice.defaultPriceTypes;
+  let normalPrice = data.price.normal;
+  let salePrice = data.price.sale;
 
   // add tags like "cooled" or "organic"
   if (attributes) {
     for (let i = 0; i < attributes.length; i++) {
       let attribute = attributes[i];
-      let tag = translator[attribute];
+      let tag = tagsTranslator[attribute];
 
-      if (tag) {
-        generalTags.push(tag);
-      } else {
-        shopTags.push(attribute);
+      if (!tag) {
+        continue;
       }
+
+      tagsData[tag.key] = tag.label;
     }
   }
 
@@ -250,29 +236,25 @@ function getProductTags(data) {
   if (priceTypes) {
     for (let i = 0; i < priceTypes.length; i++) {
       let priceType = priceTypes[i];
-      let tag = translator[priceType];
+      let tag = tagsTranslator[priceType];
 
-      if (tag) {
-        generalTags.push(tag);
-      } else {
-        shopTags.push(priceType);
+      if (!tag) {
+        continue;
       }
+
+      tagsData[tag.key] = tag.label;
     }
   }
 
-  // check if online-shop only
+  // check if vorteilscard-owners only
   if (data.vtcOnly) {
-    shopTags.push("vorteilscard only");
+    tagsData.vtcOnly = "Vorteilscard only";
   }
 
   // check if on sale
   if (normalPrice !== salePrice) {
-    generalTags.push("sale");
-  }
-
-  let tagsData = {
-    generalTags: generalTags,
-    shopTags: shopTags,
+    let saleTag = tagsTranslator.sale;
+    tagsData[saleTag.key] = saleTag.label;
   }
 
   return tagsData;

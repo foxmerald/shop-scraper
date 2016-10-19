@@ -6,6 +6,8 @@ const rp = require('request-promise');
 const deferred = require("deferred");
 const moment = require("moment");
 
+const tagsTranslator = require("./tags-translator")();
+
 var Promise = require("bluebird");
 var ProductBridge = require("./product-bridge");
 var Logger = require("./log-bridge");
@@ -31,8 +33,6 @@ function fetchData() {
       categories: categoriesList,
       products: products,
     }
-
-    debugger;
 
     return future.resolve(data);
   }).catch(error => {
@@ -171,26 +171,52 @@ function preprocessProduct(tile) {
 }
 
 function getProductTags(tile) {
-  let tags = {
-    generalTags: [],
-    shopTags: [],
-  };
+  let tagsData = {};
+  let sealsOfQuality = tile.sealOfQuality;
+  let personalPreferences = tile.personalPreferences;
 
-  /*
-  if (tile.sealOfQuality) {
-    for (let i = 0; i < tile.sealOfQuality.length; i++) {
-      console.log(tile.sealOfQuality[i].key + " - " + tile.sealOfQuality[i].label);
+  if (sealsOfQuality) {
+    for (let i = 0; i < sealsOfQuality.length; i++) {
+      let sealOfQuality = sealsOfQuality[i];
+      let tag = tagsTranslator[sealOfQuality.key];
+
+      if (!tag) {
+        continue;
+      }
+
+      tagsData[tag.key] = tag.label;
     }
   }
 
-  if (tile.personalPreferences) {
-    for (let i = 0; i < tile.personalPreferences.length; i++) {
-      console.log(tile.personalPreferences[i].key + " - " + tile.personalPreferences[i].label);
+  if (personalPreferences) {
+    for (let i = 0; i < personalPreferences.length; i++) {
+      let personalPreference = personalPreferences[i];
+      let tag = tagsTranslator[personalPreference.key];
+
+      if (!tag) {
+        continue;
+      }
+
+      tagsData[tag.key] = tag.label;
     }
   }
-  */
 
-  return tags;
+  if (tile.foodCounterId) {
+    let tag = tagsTranslator[tile.foodCounterId];
+    tagsData[tag.key] = tag.label;
+  }
+
+  if (tile.vacuumPackagingAvailable) {
+    let tag = tagsTranslator.vacuumPackagingAvailable;
+    tagsData[tag.key] = tag.label;
+  }
+
+  if (tile.weightArticle || tile.weightPieceArticle) {
+    let tag = tagsTranslator.weightArticle;
+    tagsData[tag.key] = tag.label;
+  }
+
+  return tagsData;
 }
 
 function getProductPrice(tile) {
