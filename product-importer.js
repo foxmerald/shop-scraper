@@ -33,7 +33,9 @@ const ServerBridge = (function() {
     };
 
     request(requestOptions, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
+      var job = body;
+
+      if (!error && response.statusCode === 200 && job.closedTimestamp) {
         future.resolve(body);
       } else {
         retryPolling();
@@ -101,10 +103,7 @@ var CategoryBridge = (function() {
       body: {
         shopDataKey: shopDataKey
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
     request(options, (error, response, body) => {
@@ -121,33 +120,21 @@ var CategoryBridge = (function() {
   }
 
   function finishImport(shopDataKey, jobKey) {
-    let future = deferred();
-
     let url = serverUrl + "/import/categories/finish";
-    let options = {
+    let requestOptions = {
       method: "POST",
       url: url,
       body: {
         shopDataKey: shopDataKey,
         jobKey: jobKey
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
-    request(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        Logger.log(`import finished - data fetched from ${url}: ${body}`);
-        future.resolve(body);
-      } else {
-        Logger.error(`error from ${url}: ${error}`);
-        future.reject(error);
-      }
-    });
+    let jobUrl = serverUrl + "/import/job";
+    let promise = ServerBridge.requestJob(requestOptions, jobUrl);
 
-    return future.promise;
+    return promise;
   }
 
   var bridge = {};
@@ -223,10 +210,7 @@ var ProductBridge = (function() {
       body: {
         shopDataKey: shopDataKey
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
     request(options, (error, response, body) => {
@@ -243,33 +227,21 @@ var ProductBridge = (function() {
   }
 
   function finishImport(shopDataKey, jobKey) {
-    let future = deferred();
-
     let url = serverUrl + "/import/products/finish";
-    let options = {
+    let requestOptions = {
       method: "POST",
       url: url,
       body: {
         shopDataKey: shopDataKey,
         jobKey: jobKey
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
-    request(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        Logger.log(`import finished - data fetched from ${url}: ${body}`);
-        future.resolve(body);
-      } else {
-        Logger.error(`error from ${url}: ${error}`);
-        future.reject(error);
-      }
-    });
+    let jobUrl = serverUrl + "/import/job";
+    let promise = ServerBridge.requestJob(requestOptions, jobUrl);
 
-    return future.promise;
+    return promise;
   }
 
   var bridge = {};
