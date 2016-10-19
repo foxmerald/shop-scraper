@@ -10,27 +10,76 @@ const tagsTranslator = require("./tags-translator")();
 var Promise = require("bluebird");
 var ProductBridge = require("./product-bridge");
 var Logger = require("./log-bridge");
+var TestDataBridge = require("./test-data-bridge");
 
 function fetchData() {
-  Logger.log("fetch billa data");
+  var future = deferred();
+  let testDataPromise = TestDataBridge.loadFile("billa");
 
-  var categoriesUrl = "https://shop.billa.at/api/navigation";
-  var productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
+  testDataPromise.then(testData => {
+    let categories = testData.categories;
+    let products = testData.products;
 
-  var categoriesPromise = fetchDataFromUrl(categoriesUrl);
-  var productPromise = fetchDataFromUrl(productsUrl);
-
-  return Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
-    Logger.log("preprocess billa data");
     let preprocessedData = preprocessData(categories, products);
 
-    return preprocessedData;
+    future.resolve(preprocessedData);
+  }).catch(error => {
+    if (error.code === "ENOENT") {
+      Logger.log("No Test-Data-File found. Fetching new data.");
+
+      let newDataPromise = fetchNewData();
+      newDataPromise.then(data => {
+        future.resolve(data);
+      }).catch((e) => {
+        Logger.error(`Error: ${e}`);
+        future.reject(e);
+      });
+    } else {
+      Logger.error(`Error: ${error}`);
+      future.reject(error);
+    }
+  });
+
+  return future.promise;
+}
+
+function fetchNewData() {
+  Logger.log("fetch billa data");
+
+  var future = deferred();
+
+  let categoriesUrl = "https://shop.billa.at/api/navigation";
+  let productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
+
+  let categoriesPromise = fetchDataFromUrl(categoriesUrl);
+  let productPromise = fetchDataFromUrl(productsUrl);
+
+  Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
+    let preprocessedData = preprocessData(categories, products);
+
+    saveTestData(categories, products);
+
+    future.resolve(preprocessedData);
   }).catch((e) => {
     Logger.error(e);
+    future.reject(e);
   });
+
+  return future.promise;
+}
+
+function saveTestData(categories, products) {
+  let rawData = {
+    categories: categories,
+    products: products,
+  };
+
+  TestDataBridge.saveFile("billa", rawData);
 }
 
 function preprocessData(categoriesData, productsData) {
+  Logger.log("preprocess billa data");
+
   let categories = preprocessCategories(categoriesData);
   let products = preprocessProducts(productsData, categories);
 
