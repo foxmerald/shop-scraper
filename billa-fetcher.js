@@ -17,10 +17,7 @@ function fetchData() {
   let testDataPromise = TestDataBridge.loadFile("billa");
 
   testDataPromise.then(testData => {
-    let categories = testData.categories;
-    let products = testData.products;
-
-    let preprocessedData = preprocessData(categories, products);
+    let preprocessedData = preprocessData(testData.categories, testData.products);
 
     future.resolve(preprocessedData);
   }).catch(error => {
@@ -28,6 +25,7 @@ function fetchData() {
       Logger.log("No Test-Data-File found. Fetching new data.");
 
       let newDataPromise = fetchNewData();
+
       newDataPromise.then(data => {
         future.resolve(data);
       }).catch((e) => {

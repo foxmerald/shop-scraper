@@ -17,37 +17,45 @@ function fetchData() {
   var future = deferred();
   var testDataPromise = TestDataBridge.loadFile("merkur");
 
-  testDataPromise.then((testData) => {
-    let productsData = testData.products;
-    let categoriesData = testData.categories;
+  testDataPromise.then((data) => {
+    let testData = preprocessTestData(data);
 
-    let categories = preprocessCategories(categoriesData);
-    let products = preprocessProducts(productsData);
-
-    let categoriesList = [];
-    for (var category in categories) {
-      categoriesList.push(categories[category]);
-    }
-
-    let data = {
-      categories: categoriesList,
-      products: products,
-    }
-
-    return future.resolve(data);
+    future.resolve(data);
   }).catch(error => {
     if (error.code === "ENOENT") {
       Logger.log("No Test-Data-File found. Fetching new data.");
 
-      return fetchNewData();
+      let newDataPromise = fetchNewData();
+      newDataPromise.then(data => {
+        future.resolve(data);
+      }).catch(e => {
+        Logger.error(`Error: ${e}`);
+        future.reject(e);
+      })
     } else {
-      Logger.error("Error: " + error);
-
-      return future.reject();
+      Logger.error(`Error: ${error}`);
+      future.reject(error);
     }
   });
 
   return future.promise;
+}
+
+function preprocessTestData(testData) {
+  let categories = preprocessCategories(testData.categories);
+  let products = preprocessProducts(testData.products);
+
+  let categoriesList = [];
+  for (var category in categories) {
+    categoriesList.push(categories[category]);
+  }
+
+  let data = {
+    categories: categoriesList,
+    products: products,
+  };
+
+  return data;
 }
 
 function fetchNewData() {
@@ -67,17 +75,11 @@ function fetchNewData() {
 
     let productsPromise = fetchProducts(urls);
     productsPromise.then(result => {
-      // save fetched Data to test-data file
-      let rawData = {
-        categories: categoriesData,
-        products: result,
-      };
-
-      TestDataBridge.saveFile("merkur", rawData);
+      saveTestData(categoriesData, result);
 
       let products = preprocessProducts(result);
-
       let categoriesList = [];
+
       for (var category in categories) {
         categoriesList.push(categories[category]);
       }
@@ -87,17 +89,26 @@ function fetchNewData() {
         products: products,
       };
 
-      return future.resolve(data);
+      future.resolve(data);
     }).catch(error => {
-      Logger.error("Error: " + error);
+      Logger.error(`Error: ${error}`);
       future.reject(error);
     });
   }).catch(error => {
-    Logger.error("Error: " + error);
+    Logger.error(`Error: ${error}`);
     future.reject(error);
   });
 
   return future.promise;
+}
+
+function saveTestData(categories, products) {
+  let rawData = {
+    categories: categories,
+    products: products,
+  };
+
+  TestDataBridge.saveFile("merkur", rawData);
 }
 
 function appendAdditionalCategories(urls) {
