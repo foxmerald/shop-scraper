@@ -20,7 +20,7 @@ function fetchData() {
   testDataPromise.then((data) => {
     let testData = preprocessTestData(data);
 
-    future.resolve(data);
+    future.resolve(testData);
   }).catch(error => {
     if (error.code === "ENOENT") {
       Logger.log("No Test-Data-File found. Fetching new data.");
