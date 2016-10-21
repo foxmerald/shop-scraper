@@ -12,6 +12,8 @@ if (process.env.ZUPER_PRODUCTION) {
 }
 
 var apiKey = process.env.ZUPER_API_KEY;
+// TODO: remove
+apiKey = "G2sxb819q4J8Q5n878b4kvC7647la5Qh";
 
 const ServerBridge = (function() {
   function pollJob(jobUrl, jobKey, future) {
