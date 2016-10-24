@@ -1,5 +1,7 @@
 "use strict";
 
+const SHOP_DATA_KEY = 2;
+
 const request = require("request");
 const util = require("util");
 const rp = require('request-promise');
@@ -15,12 +17,12 @@ var TestDataBridge = require("./test-data-bridge");
 
 function fetchData() {
   var future = deferred();
-  var testDataPromise = TestDataBridge.loadFile("merkur");
+  var testDataPromise = TestDataBridge.loadFile(SHOP_DATA_KEY);
 
   testDataPromise.then((data) => {
     let testData = preprocessTestData(data);
 
-    future.resolve(data);
+    future.resolve(testData);
   }).catch(error => {
     if (error.code === "ENOENT") {
       Logger.log("No Test-Data-File found. Fetching new data.");
@@ -108,7 +110,7 @@ function saveTestData(categories, products) {
     products: products,
   };
 
-  TestDataBridge.saveFile("merkur", rawData);
+  TestDataBridge.saveFile(SHOP_DATA_KEY, rawData);
 }
 
 function appendAdditionalCategories(urls) {

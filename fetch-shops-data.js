@@ -5,15 +5,14 @@ const requestPromise = require("request-promise");
 const deferred = require("deferred");
 
 var ProductImporter = require("./product-importer");
-var CategoryBridge = ProductImporter.CategoryBridge;
-var ProductBridge = ProductImporter.ProductBridge;
+var ImportBridge = ProductImporter.ImportBridge;
 var ServerBridge = ProductImporter.ServerBridge;
 
 var Logger = require("./log-bridge");
 
 const shopDataKeys = {
   billa: 1,
-  merkur: 2,
+  merkur: 2
 }
 
 Logger.log("start fetching data");
@@ -25,9 +24,13 @@ var billaPromise = billaFetcher.fetchData();
 billaPromise.then(data => {
   Logger.log("send billa data");
 
-  var categoriesPromise = sendCategoriesData(shopDataKeys.billa, data.categories);
+  let shopDataKey = shopDataKeys.billa;
+
+  sendRawData(shopDataKey);
+
+  var categoriesPromise = sendCategoriesData(shopDataKey, data.categories);
   categoriesPromise.then(function() {
-    var productsPromise = sendProductsData(shopDataKeys.billa, data.products);
+    var productsPromise = sendProductsData(shopDataKey, data.products);
     productsPromise.catch(Logger.error);
   }).catch(Logger.error);
 }).catch(Logger.error);
@@ -37,13 +40,15 @@ var merkurFetcher = require("./merkur-fetcher");
 var merkurPromise = merkurFetcher.fetchData();
 
 merkurPromise.then(data => {
-  debugger;
   Logger.log("send merkur data");
 
-  var categoriesPromise = sendCategoriesData(shopDataKeys.merkur, data.categories);
+  let shopDataKey = shopDataKeys.merkur;
+
+  sendRawData(shopDataKey);
+
+  var categoriesPromise = sendCategoriesData(shopDataKey, data.categories);
   categoriesPromise.then(function() {
-    debugger;
-    var productsPromise = sendProductsData(shopDataKeys.merkur, data.products);
+    var productsPromise = sendProductsData(shopDataKey, data.products);
     productsPromise.catch(Logger.error);
   }).catch(Logger.error);
 }).catch(Logger.error);
@@ -53,14 +58,14 @@ function sendProductsData(shopDataKey, products) {
 
   Logger.log("products start import");
 
-  ProductBridge.startImport(shopDataKey).then(job => {
+  ImportBridge.startProductsImport(shopDataKey).then(job => {
     Logger.log("products import started");
     var jobKey = job.key;
 
-    ProductBridge.saveProducts(shopDataKey, products).then(result => {
+    ImportBridge.saveProducts(shopDataKey, products).then(result => {
       Logger.log("products sent");
 
-      ProductBridge.finishImport(shopDataKey, jobKey).then(job => {
+      ImportBridge.finishProductsImport(shopDataKey, jobKey).then(job => {
         Logger.log("products import finished");
 
         future.resolve();
@@ -76,15 +81,15 @@ function sendCategoriesData(shopDataKey, categories) {
 
   Logger.log("categories start import");
 
-  CategoryBridge.startImport(shopDataKey).then(job => {
+  ImportBridge.startCategoriesImport(shopDataKey).then(job => {
     Logger.log("categories import started");
 
     var jobKey = job.key;
 
-    CategoryBridge.saveCategories(shopDataKey, categories).then(result => {
+    ImportBridge.saveCategories(shopDataKey, categories).then(result => {
       Logger.log("categories sent");
 
-      CategoryBridge.finishImport(shopDataKey, jobKey).then(job => {
+      ImportBridge.finishCategoriesImport(shopDataKey, jobKey).then(job => {
         Logger.log("categories import finished");
 
         future.resolve();
@@ -94,3 +99,5 @@ function sendCategoriesData(shopDataKey, categories) {
 
   return future.promise;
 }
+
+function sendRawData(shopDataKey) {}
