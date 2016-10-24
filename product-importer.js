@@ -89,7 +89,45 @@ const ServerBridge = (function() {
   return bridge;
 })();
 
-var CategoryBridge = (function() {
+const ImportBridge = (function() {
+  function startImport(url, shopDataKey) {
+    let requestOptions = {
+      method: "POST",
+      url: url,
+      body: {
+        shopDataKey: shopDataKey
+      },
+      json: true
+    };
+
+    var promise = ServerBridge.authenticateRequest(requestOptions);
+
+    return promise;
+  }
+
+  function finishImport(url, shopDataKey, jobKey) {
+    let requestOptions = {
+      method: "POST",
+      url: url,
+      body: {
+        shopDataKey: shopDataKey,
+        jobKey: jobKey
+      },
+      json: true
+    };
+
+    let jobUrl = serverUrl + "/import/job";
+    let promise = ServerBridge.requestJob(requestOptions, jobUrl);
+
+    return promise;
+  }
+
+  function startCategoriesImport() {
+    let url = serverUrl + "/import/categories/start";
+
+    return startImport(url);
+  }
+
   function saveCategories(shopDataKey, categories) {
     let requestUrl = serverUrl + "/import/categories"
 
@@ -112,49 +150,18 @@ var CategoryBridge = (function() {
     return promise;
   }
 
-  function startImport(shopDataKey) {
-    let url = serverUrl + "/import/categories/start";
-    let requestOptions = {
-      method: "POST",
-      url: url,
-      body: {
-        shopDataKey: shopDataKey
-      },
-      json: true
-    };
-
-    var promise = ServerBridge.authenticateRequest(requestOptions);
-
-    return promise;
-  }
-
-  function finishImport(shopDataKey, jobKey) {
+  function finishCategoriesImport(jobKey) {
     let url = serverUrl + "/import/categories/finish";
-    let requestOptions = {
-      method: "POST",
-      url: url,
-      body: {
-        shopDataKey: shopDataKey,
-        jobKey: jobKey
-      },
-      json: true
-    };
 
-    let jobUrl = serverUrl + "/import/job";
-    let promise = ServerBridge.requestJob(requestOptions, jobUrl);
-
-    return promise;
+    return finishImport(url, jobKey);
   }
 
-  var bridge = {};
-  bridge.saveCategories = saveCategories;
-  bridge.startImport = startImport;
-  bridge.finishImport = finishImport;
+  function startProductsImport() {
+    let url = serverUrl + "/import/products/start";
 
-  return bridge;
-})();
+    return startImport(url);
+  }
 
-var ProductBridge = (function() {
   function saveProductBatch(previousPromise, shopDataKey, products) {
     if (previousPromise) {
       previousPromise.done(function() {
@@ -209,50 +216,26 @@ var ProductBridge = (function() {
     return future.promise;
   }
 
-  function startImport(shopDataKey) {
-    let url = serverUrl + "/import/products/start";
-    let requestOptions = {
-      method: "POST",
-      url: url,
-      body: {
-        shopDataKey: shopDataKey
-      },
-      json: true
-    };
+  function finishProductsImport(jobKey) {
+    let url = serverUrl + "/import/products/finish";
 
-    var promise = ServerBridge.authenticateRequest(requestOptions);
-
-    return promise;
+    return finishImport(url, jobKey);
   }
 
-  function finishImport(shopDataKey, jobKey) {
-    let url = serverUrl + "/import/products/finish";
-    let requestOptions = {
-      method: "POST",
-      url: url,
-      body: {
-        shopDataKey: shopDataKey,
-        jobKey: jobKey
-      },
-      json: true
-    };
-
-    let jobUrl = serverUrl + "/import/job";
-    let promise = ServerBridge.requestJob(requestOptions, jobUrl);
-
-    return promise;
+  function saveRawData(shopDataKey) {
   }
 
   var bridge = {};
+  bridge.startCategoriesImport = startCategoriesImport;
+  bridge.saveCategories = saveCategories;
+  bridge.finishCategoriesImport = finishCategoriesImport;
+  bridge.startProductsImport = startProductsImport;
   bridge.saveProducts = saveProducts;
-  bridge.startImport = startImport;
-  bridge.finishImport = finishImport;
-
-  return bridge;
+  bridge.finishProductsImport = finishProductsImport;
+  bridge.saveRawData = saveRawData;
 })();
 
 module.exports = {
-  ProductBridge: ProductBridge,
-  CategoryBridge: CategoryBridge,
+  ImportBridge: ImportBridge,
   ServerBridge: ServerBridge,
 }

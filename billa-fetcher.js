@@ -1,5 +1,7 @@
 "use strict";
 
+const SHOP_DATA_KEY = 1;
+
 const request = require("request");
 const util = require("util");
 const rp = require('request-promise');
@@ -14,7 +16,7 @@ var TestDataBridge = require("./test-data-bridge");
 
 function fetchData() {
   var future = deferred();
-  let testDataPromise = TestDataBridge.loadFile("billa");
+  let testDataPromise = TestDataBridge.loadFile(SHOP_DATA_KEY);
 
   testDataPromise.then(testData => {
     let preprocessedData = preprocessData(testData.categories, testData.products);
@@ -44,7 +46,7 @@ function fetchData() {
 function fetchNewData() {
   Logger.log("fetch billa data");
 
-  var future = deferred();
+  let future = deferred();
 
   let categoriesUrl = "https://shop.billa.at/api/navigation";
   let productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
@@ -72,7 +74,7 @@ function saveTestData(categories, products) {
     products: products,
   };
 
-  TestDataBridge.saveFile("billa", rawData);
+  TestDataBridge.saveFile(SHOP_DATA_KEY, rawData);
 }
 
 function preprocessData(categoriesData, productsData) {
