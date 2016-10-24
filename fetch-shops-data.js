@@ -8,6 +8,7 @@ var ProductImporter = require("./product-importer");
 var ImportBridge = ProductImporter.ImportBridge;
 var ServerBridge = ProductImporter.ServerBridge;
 
+var TestDataBridge = require("./test-data-bridge");
 var Logger = require("./log-bridge");
 
 const shopDataKeys = {
@@ -100,4 +101,9 @@ function sendCategoriesData(shopDataKey, categories) {
   return future.promise;
 }
 
-function sendRawData(shopDataKey) {}
+function sendRawData(shopDataKey) {
+  var dataPromise = TestDataBridge.loadFile(shopDataKey);
+  dataPromise.then(function(data) {
+    ImportBridge.saveRawData(shopDataKey, data);
+  });
+}

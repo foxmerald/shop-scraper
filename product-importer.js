@@ -138,10 +138,7 @@ const ImportBridge = (function() {
         shopDataKey: shopDataKey,
         categories: categories
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
     let jobUrl = serverUrl + "/import/job";
@@ -180,10 +177,7 @@ const ImportBridge = (function() {
         shopDataKey: shopDataKey,
         products: products
       },
-      json: true,
-      qs: {
-        shopDataKey: shopDataKey
-      }
+      json: true
     };
 
     let jobUrl = serverUrl + "/import/job";
@@ -222,7 +216,44 @@ const ImportBridge = (function() {
     return finishImport(url, shopDataKey, jobKey);
   }
 
-  function saveRawData(shopDataKey) {}
+  function saveRawData(shopDataKey, data) {
+    let future = deferred();
+
+    let requestUrl = serverUrl + "/import/raw";
+
+    let requestOptions = {
+      method: "GET",
+      uri: requestUrl,
+      json: true,
+      qs: {
+        shopDataKey: shopDataKey
+      }
+    };
+
+    let promise = ServerBridge.authenticateRequest(requestOptions);
+    promise.then(function(body) {
+      let uploadUrl = body.url;
+
+      let requestOptions = {
+        method: "PUT",
+        uri: uploadUrl,
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "image/jpeg"
+        }
+      };
+
+      request(requestOptions, (error, response, body) => {
+        if (!error && response.statusCode === 200) {
+          future.resolve();
+        } else {
+          future.reject(error);
+        }
+      });
+    }).catch(future.reject);
+
+    return future.promise;
+  }
 
   var bridge = {};
   bridge.startCategoriesImport = startCategoriesImport;
