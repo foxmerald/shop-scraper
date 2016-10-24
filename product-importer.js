@@ -222,8 +222,7 @@ const ImportBridge = (function() {
     return finishImport(url, jobKey);
   }
 
-  function saveRawData(shopDataKey) {
-  }
+  function saveRawData(shopDataKey) {}
 
   var bridge = {};
   bridge.startCategoriesImport = startCategoriesImport;
@@ -233,6 +232,8 @@ const ImportBridge = (function() {
   bridge.saveProducts = saveProducts;
   bridge.finishProductsImport = finishProductsImport;
   bridge.saveRawData = saveRawData;
+
+  return bridge;
 })();
 
 module.exports = {
