@@ -71,7 +71,7 @@ const ServerBridge = (function() {
     requestOptions.headers["x-zuper-api-key"] = apiKey;
 
     request(requestOptions, (error, response, body) => {
-      if (!error) {
+      if (!error && response.statusCode === 200) {
         future.resolve(body);
       } else {
         future.reject(error);
@@ -122,10 +122,10 @@ const ImportBridge = (function() {
     return promise;
   }
 
-  function startCategoriesImport() {
+  function startCategoriesImport(shopDataKey) {
     let url = serverUrl + "/import/categories/start";
 
-    return startImport(url);
+    return startImport(url, shopDataKey);
   }
 
   function saveCategories(shopDataKey, categories) {
@@ -150,16 +150,16 @@ const ImportBridge = (function() {
     return promise;
   }
 
-  function finishCategoriesImport(jobKey) {
+  function finishCategoriesImport(shopDataKey, jobKey) {
     let url = serverUrl + "/import/categories/finish";
 
-    return finishImport(url, jobKey);
+    return finishImport(url, shopDataKey, jobKey);
   }
 
-  function startProductsImport() {
+  function startProductsImport(shopDataKey) {
     let url = serverUrl + "/import/products/start";
 
-    return startImport(url);
+    return startImport(url, shopDataKey);
   }
 
   function saveProductBatch(previousPromise, shopDataKey, products) {
@@ -216,10 +216,10 @@ const ImportBridge = (function() {
     return future.promise;
   }
 
-  function finishProductsImport(jobKey) {
+  function finishProductsImport(shopDataKey, jobKey) {
     let url = serverUrl + "/import/products/finish";
 
-    return finishImport(url, jobKey);
+    return finishImport(url, shopDataKey, jobKey);
   }
 
   function saveRawData(shopDataKey) {}
