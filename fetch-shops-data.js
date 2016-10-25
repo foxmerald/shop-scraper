@@ -3,6 +3,7 @@
 const Deferred = require("deferred");
 const ImportBridge = require("./import-bridge");
 const Logger = require("./log-bridge");
+const TestDataBridge = require("./test-data-bridge");
 
 const SHOP_DATA_KEYS = {
   billa: 1,
