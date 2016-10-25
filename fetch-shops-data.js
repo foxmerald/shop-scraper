@@ -1,8 +1,9 @@
 "use strict";
 
 const Deferred = require("deferred");
-const ImportBridge = require("./import-bridge");
-const Logger = require("./log-bridge");
+const ImportBridge = require("./bridges/import-bridge");
+const Logger = require("./bridges/log-bridge");
+const TestDataBridge = require("./bridges/test-data-bridge");
 
 const SHOP_DATA_KEYS = {
   billa: 1,
@@ -15,7 +16,7 @@ fetchAndSendData("merkur");
 function fetchAndSendData(shopName) {
   Logger.log(`start fetching ${shopName} data`);
 
-  let fetcher = require(`./${shopName}-fetcher`);
+  let fetcher = require(`./shops-fetcher/${shopName}-fetcher`);
   let promise = fetcher.fetchData();
 
   promise.then(data => {
@@ -36,6 +37,8 @@ function fetchAndSendData(shopName) {
 }
 
 function sendRawData(shopDataKey) {
+  Logger.log(`send raw data`);
+
   var dataPromise = TestDataBridge.loadFile(shopDataKey);
   dataPromise.then(function(data) {
     ImportBridge.saveRawData(shopDataKey, data);
