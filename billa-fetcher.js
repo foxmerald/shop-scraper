@@ -2,20 +2,16 @@
 
 const SHOP_DATA_KEY = 1;
 
-const request = require("request");
-const util = require("util");
-const rp = require('request-promise');
-const deferred = require("deferred");
-
-const tagsTranslator = require("./tags-translator")();
-
-var Promise = require("bluebird");
-var ProductBridge = require("./product-bridge");
-var Logger = require("./log-bridge");
-var TestDataBridge = require("./test-data-bridge");
+const Request = require("request");
+const Deferred = require("deferred");
+const Promise = require("bluebird");
+const TagsTranslator = require("./tags-translator")();
+const ProductBridge = require("./product-bridge");
+const Logger = require("./log-bridge");
+const TestDataBridge = require("./test-data-bridge");
 
 function fetchData() {
-  var future = deferred();
+  var future = Deferred();
   let testDataPromise = TestDataBridge.loadFile(SHOP_DATA_KEY);
 
   testDataPromise.then(testData => {
@@ -28,14 +24,9 @@ function fetchData() {
 
       let newDataPromise = fetchNewData();
 
-      newDataPromise.then(data => {
-        future.resolve(data);
-      }).catch((e) => {
-        Logger.error(`Error: ${e}`);
-        future.reject(e);
-      });
+      newDataPromise.then(future.resolve)
+        .catch(future.reject);
     } else {
-      Logger.error(`Error: ${error}`);
       future.reject(error);
     }
   });
@@ -46,7 +37,7 @@ function fetchData() {
 function fetchNewData() {
   Logger.log("fetch billa data");
 
-  let future = deferred();
+  let future = Deferred();
 
   let categoriesUrl = "https://shop.billa.at/api/navigation";
   let productsUrl = "https://shop.billa.at/api/search/full?category=B2&pageSize=9175&isFirstPage=true&isLastPage=true";
@@ -60,10 +51,7 @@ function fetchNewData() {
     saveTestData(categories, products);
 
     future.resolve(preprocessedData);
-  }).catch((e) => {
-    Logger.error(e);
-    future.reject(e);
-  });
+  }).catch(future.reject);
 
   return future.promise;
 }
@@ -271,7 +259,7 @@ function getProductTags(data) {
   if (attributes) {
     for (let i = 0; i < attributes.length; i++) {
       let attribute = attributes[i];
-      let tag = tagsTranslator[attribute];
+      let tag = TagsTranslator[attribute];
 
       if (!tag) {
         continue;
@@ -285,7 +273,7 @@ function getProductTags(data) {
   if (priceTypes) {
     for (let i = 0; i < priceTypes.length; i++) {
       let priceType = priceTypes[i];
-      let tag = tagsTranslator[priceType];
+      let tag = TagsTranslator[priceType];
 
       if (!tag) {
         continue;
@@ -302,7 +290,7 @@ function getProductTags(data) {
 
   // check if on sale
   if (normalPrice !== salePrice) {
-    let saleTag = tagsTranslator.sale;
+    let saleTag = TagsTranslator.sale;
     tagsData[saleTag.key] = saleTag.label;
   }
 
@@ -352,7 +340,7 @@ function getSlugFromUrl(string) {
 }
 
 function fetchDataFromUrl(url) {
-  var future = deferred();
+  var future = Deferred();
 
   let options = {
     url: url,
@@ -363,7 +351,7 @@ function fetchDataFromUrl(url) {
     },
   };
 
-  let promise = request(options, (error, response, body) => {
+  let promise = Request(options, (error, response, body) => {
     if (!error && response.statusCode === 200) {
       Logger.log("raw billa data fetched from " + url);
       future.resolve(body);
