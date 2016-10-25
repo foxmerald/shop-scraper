@@ -35,4 +35,9 @@ function fetchAndSendData(shopName) {
   }).catch(Logger.error);
 }
 
-function sendRawData(shopDataKey) {}
+function sendRawData(shopDataKey) {
+  var dataPromise = TestDataBridge.loadFile(shopDataKey);
+  dataPromise.then(function(data) {
+    ImportBridge.saveRawData(shopDataKey, data);
+  });
+}
