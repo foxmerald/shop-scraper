@@ -2,21 +2,18 @@
 
 const SHOP_DATA_KEY = 2;
 
-const request = require("request");
-const util = require("util");
-const rp = require('request-promise');
-const deferred = require("deferred");
-const moment = require("moment");
+const Request = require("request");
+const Deferred = require("deferred");
+const Promise = require("bluebird");
+const Moment = require("moment");
 
-const tagsTranslator = require("./tags-translator")();
-
-var Promise = require("bluebird");
-var ProductBridge = require("./product-bridge");
-var Logger = require("./log-bridge");
-var TestDataBridge = require("./test-data-bridge");
+const TagsTranslator = require("./tags-translator")();
+const ProductBridge = require("./product-bridge");
+const Logger = require("./log-bridge");
+const TestDataBridge = require("./test-data-bridge");
 
 function fetchData() {
-  var future = deferred();
+  var future = Deferred();
   var testDataPromise = TestDataBridge.loadFile(SHOP_DATA_KEY);
 
   testDataPromise.then((data) => {
@@ -30,9 +27,9 @@ function fetchData() {
       let newDataPromise = fetchNewData();
       newDataPromise.then(data => {
         future.resolve(data);
-      }).catch(e => {
-        Logger.error(`Error: ${e}`);
-        future.reject(e);
+      }).catch(error => {
+        Logger.error(`Error: ${error}`);
+        future.reject(error);
       })
     } else {
       Logger.error(`Error: ${error}`);
@@ -46,22 +43,13 @@ function fetchData() {
 function preprocessTestData(testData) {
   let categories = preprocessCategories(testData.categories);
   let products = preprocessProducts(testData.products);
-
-  let categoriesList = [];
-  for (var category in categories) {
-    categoriesList.push(categories[category]);
-  }
-
-  let data = {
-    categories: categoriesList,
-    products: products,
-  };
+  let data = createImportData(categories, products);
 
   return data;
 }
 
 function fetchNewData() {
-  var future = deferred();
+  var future = Deferred();
   var categoriesPromise = fetchCategories();
 
   categoriesPromise.then((categoriesData) => {
@@ -72,24 +60,15 @@ function fetchNewData() {
       urls.push(categories[category].url);
     }
 
-    // append further categories like e.g. store brand or vegan
-    urls = appendAdditionalCategories(urls);
+    // append further categories like e.g. "store brand" or "vegan"
+    appendAdditionalCategories(urls);
 
     let productsPromise = fetchProducts(urls);
     productsPromise.then(result => {
       saveTestData(categoriesData, result);
 
       let products = preprocessProducts(result);
-      let categoriesList = [];
-
-      for (var category in categories) {
-        categoriesList.push(categories[category]);
-      }
-
-      let data = {
-        categories: categoriesList,
-        products: products,
-      };
+      let data = createImportData(categories, products);
 
       future.resolve(data);
     }).catch(error => {
@@ -104,6 +83,18 @@ function fetchNewData() {
   return future.promise;
 }
 
+function createImportData(categories, products) {
+  let categoriesList = [];
+  for (var category in categories) {
+    categoriesList.push(categories[category]);
+  }
+
+  return {
+    categories: categoriesList,
+    products: products,
+  };
+}
+
 function saveTestData(categories, products) {
   let rawData = {
     categories: categories,
@@ -114,23 +105,21 @@ function saveTestData(categories, products) {
 }
 
 function appendAdditionalCategories(urls) {
-  const additionalCategories = ["immer-gut-tiere", "merkurimmergut", "laktosefrei-category", "milchalternativen", "clever-category", "clever-milchprodukte", "alnatura-baby", "alnatura-category", "vegane-produkte", "vega-vita"];
+  const ADDITIONAL_CATEGORIES = ["immer-gut-tiere", "merkurimmergut", "laktosefrei-category", "milchalternativen", "clever-category", "clever-milchprodukte", "alnatura-baby", "alnatura-category", "vegane-produkte", "vega-vita"];
 
-  for (let i = 0; i < additionalCategories.length; i++) {
-    let additionalCategory = additionalCategories[i];
+  for (let i = 0; i < ADDITIONAL_CATEGORIES.length; i++) {
+    let additionalCategory = ADDITIONAL_CATEGORIES[i];
     let additionalUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${additionalCategory}`;
 
     if (!urls.includes(additionalUrl)) {
       urls.push(additionalUrl);
     }
   }
-
-  return urls;
 }
 
 function preprocessProducts(result) {
-  let productsDataRaw = preprocessProductsDataRaw(result);
-  let productsData = filterOutDuplicates(productsDataRaw);
+  let rawProductsData = preprocessRawProductsData(result);
+  let productsData = filterOutDuplicates(rawProductsData);
   let products = preprocessProductsData(productsData);
 
   return products;
@@ -191,7 +180,7 @@ function getProductTags(tile) {
   if (sealsOfQuality) {
     for (let i = 0; i < sealsOfQuality.length; i++) {
       let sealOfQuality = sealsOfQuality[i];
-      let tag = tagsTranslator[sealOfQuality.key];
+      let tag = TagsTranslator[sealOfQuality.key];
 
       if (!tag) {
         continue;
@@ -204,7 +193,7 @@ function getProductTags(tile) {
   if (personalPreferences) {
     for (let i = 0; i < personalPreferences.length; i++) {
       let personalPreference = personalPreferences[i];
-      let tag = tagsTranslator[personalPreference.key];
+      let tag = TagsTranslator[personalPreference.key];
 
       if (!tag) {
         continue;
@@ -215,17 +204,17 @@ function getProductTags(tile) {
   }
 
   if (tile.foodCounterId) {
-    let tag = tagsTranslator[tile.foodCounterId];
+    let tag = TagsTranslator[tile.foodCounterId];
     tagsData[tag.key] = tag.label;
   }
 
   if (tile.vacuumPackagingAvailable) {
-    let tag = tagsTranslator.vacuumPackagingAvailable;
+    let tag = TagsTranslator.vacuumPackagingAvailable;
     tagsData[tag.key] = tag.label;
   }
 
   if (tile.weightArticle || tile.weightPieceArticle) {
-    let tag = tagsTranslator.weightArticle;
+    let tag = TagsTranslator.weightArticle;
     tagsData[tag.key] = tag.label;
   }
 
@@ -335,11 +324,11 @@ function getPricePerUnit(tile, price) {
   return pricePerUnitInfo;
 }
 
-function filterOutDuplicates(productsDataRaw) {
+function filterOutDuplicates(rawProductsData) {
   let productsData = {};
 
-  for (let i = 0; i < productsDataRaw.length; i++) {
-    let product = productsDataRaw[i];
+  for (let i = 0; i < rawProductsData.length; i++) {
+    let product = rawProductsData[i];
     let productId = product.sku;
 
     if (!productsData[productId]) {
@@ -363,7 +352,7 @@ function filterOutDuplicates(productsDataRaw) {
   return productsData;
 }
 
-function preprocessProductsDataRaw(result) {
+function preprocessRawProductsData(result) {
   let productsData = [];
 
   for (let i = 0; i < result.length; i++) {
@@ -453,7 +442,7 @@ function getCategoryUrl(categorySlug, slug) {
     "vegan": "vegane-produkte",
   };
 
-  if (Object.keys(translator).includes(slug)) {
+  if (translator[slug]) {
     categoryUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${translator[slug]}`;
   } else if (categorySlug.includes("aktion-und-promotion")) {
     categoryUrl = `https://www.merkurmarkt.at/api/shop/articles/category/${slug}-category`;
@@ -465,63 +454,66 @@ function getCategoryUrl(categorySlug, slug) {
 }
 
 function fetchProducts(categoryUrls, results = [], pageNr = 0) {
-  if (!categoryUrls.length /*|| results.length > 20*/ ) { //TODO: remove results.length
+  if (!categoryUrls.length) {
     return results;
   }
 
+  let future = Deferred();
   let categoryUrl = categoryUrls.shift();
-  let nowTimestamp = moment().unix() * 1000;
-
+  let nowTimestamp = Moment().unix() * 1000;
   let url = `${categoryUrl}?pageSize=500&page=${pageNr}&timestamp=${nowTimestamp}`;
   let options = {
     url: url,
     json: true
   };
 
-  // show status/progress log
-  let insges = results.length + categoryUrls.length + 1;
-  let current = results.length;
-  Logger.log(`${Math.floor(current/insges*100)}% ${current}/${insges} - ${url}`);
+  logProgress(categoryUrls, results, url);
 
-  let promise = new Promise((resolve, reject) => {
-    request(options, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        Logger.log(`Success: ${categoryUrl} (Page ${pageNr}, ${body.count} products)`);
-        results.push(body);
+  Request(options, (error, response, body) => {
+    if (!error && response.statusCode === 200) {
+      Logger.log(`Success: ${categoryUrl} (Page ${pageNr}, ${body.count} products)`);
+      results.push(body);
 
-        let hasSeveralProductPages = body.total !== body.count + body.offset;
-        let isArticlesPage = url.includes("/articles/");
+      let hasSeveralProductPages = body.total !== body.count + body.offset;
+      let isArticlesPage = url.includes("/articles/");
 
-        if (hasSeveralProductPages && !isArticlesPage) {
-          categoryUrls.unshift(categoryUrl);
-          resolve(fetchProducts(categoryUrls, results, pageNr + 1));
-          return;
-        }
-      } else {
-        Logger.error("Error - " + categoryUrl + ": " + error);
+      if (hasSeveralProductPages && !isArticlesPage) {
+        categoryUrls.unshift(categoryUrl);
+
+        future.resolve(fetchProducts(categoryUrls, results, pageNr + 1));
+        return;
       }
+    } else {
+      Logger.error(`Error - ${categoryUrl}: ${error}`);
+    }
 
-      resolve(fetchProducts(categoryUrls, results));
-    });
+    future.resolve(fetchProducts(categoryUrls, results));
   });
 
-  return promise;
+  return future.promise;
+}
+
+function logProgress(categoryUrls, results, url) {
+  let total = results.length + categoryUrls.length + 1;
+  let current = results.length;
+
+  Logger.log(`${Math.floor(current/total*100)}% ${current}/${total} - ${url}`);
 }
 
 function fetchCategories() {
-  let future = deferred();
-  let nowTimestamp = moment().unix() * 1000;
+  let future = Deferred();
+  let nowTimestamp = Moment().unix() * 1000;
 
   let options = {
     url: `https://www.merkurmarkt.at/api/nav/${nowTimestamp}/anon`,
     json: true
   };
 
-  let promise = request(options, (error, response, body) => {
+  let promise = Request(options, (error, response, body) => {
     if (!error && response.statusCode === 200) {
       future.resolve(body);
     } else {
-      Logger.error("Error: " + error);
+      Logger.error(`Error: ${error}`);
       future.reject(error);
     }
   });
