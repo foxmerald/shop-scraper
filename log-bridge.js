@@ -1,10 +1,12 @@
-const moment = require("moment");
+const Moment = require("moment");
 
-module.exports = {
+let logger = {
   log: function(log) {
-    console.log(`${moment().format("HH:mm:ss")} ${log}`)
+    console.log(`${Moment().format("HH:mm:ss")} ${log}`)
   },
   error: function(log) {
-    console.error(`${moment().format("HH:mm:ss")} ${log}`)
+    console.error(`${Moment().format("HH:mm:ss")} ${log}`)
   },
 };
+
+module.exports = logger;

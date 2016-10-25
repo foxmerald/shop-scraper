@@ -158,7 +158,7 @@ function getProductSales(data, normalPrice, product) {
   let pricePerUnit = getPricePerUnit(data, salePrice);
   let discount = getProductDiscount(data);
 
-  let sale = product.salesTemplate();
+  let sale = new ProductBridge.Sale();
 
   sale.price.price = salePrice;
 

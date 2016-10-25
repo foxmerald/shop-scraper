@@ -1,103 +1,38 @@
 "use strict";
 
-const request = require('request');
-const requestPromise = require("request-promise");
-const deferred = require("deferred");
+const Deferred = require("deferred");
+const ImportBridge = require("./import-bridge");
+const Logger = require("./log-bridge");
 
-var ProductImporter = require("./product-importer");
-var ImportBridge = ProductImporter.ImportBridge;
-var ServerBridge = ProductImporter.ServerBridge;
-
-var Logger = require("./log-bridge");
-
-const shopDataKeys = {
+const SHOP_DATA_KEYS = {
   billa: 1,
   merkur: 2
 }
 
-Logger.log("start fetching data");
+fetchAndSendData("billa");
+fetchAndSendData("merkur");
 
-// BILLA
-var billaFetcher = require("./billa-fetcher");
-var billaPromise = billaFetcher.fetchData();
+function fetchAndSendData(shopName) {
+  Logger.log(`start fetching ${shopName} data`);
 
-billaPromise.then(data => {
-  Logger.log("send billa data");
+  let fetcher = require(`./${shopName}-fetcher`);
+  let promise = fetcher.fetchData();
 
-  let shopDataKey = shopDataKeys.billa;
+  promise.then(data => {
+    Logger.log(`send ${shopName} categories`);
 
-  sendRawData(shopDataKey);
+    let shopDataKey = SHOP_DATA_KEYS[shopName];
 
-  var categoriesPromise = sendCategoriesData(shopDataKey, data.categories);
-  categoriesPromise.then(function() {
-    var productsPromise = sendProductsData(shopDataKey, data.products);
-    productsPromise.catch(Logger.error);
+    sendRawData(shopDataKey);
+
+    let categoriesPromise = ImportBridge.sendCategoriesData(shopDataKey, data.categories);
+    categoriesPromise.then(function() {
+      Logger.log(`send ${shopName} products`);
+
+      let productsPromise = ImportBridge.sendProductsData(shopDataKey, data.products);
+      productsPromise.catch(Logger.error);
+    }).catch(Logger.error);
   }).catch(Logger.error);
-}).catch(Logger.error);
-
-// MERKUR
-var merkurFetcher = require("./merkur-fetcher");
-var merkurPromise = merkurFetcher.fetchData();
-
-merkurPromise.then(data => {
-  Logger.log("send merkur data");
-
-  let shopDataKey = shopDataKeys.merkur;
-
-  sendRawData(shopDataKey);
-
-  var categoriesPromise = sendCategoriesData(shopDataKey, data.categories);
-  categoriesPromise.then(function() {
-    var productsPromise = sendProductsData(shopDataKey, data.products);
-    productsPromise.catch(Logger.error);
-  }).catch(Logger.error);
-}).catch(Logger.error);
-
-function sendProductsData(shopDataKey, products) {
-  var future = deferred();
-
-  Logger.log("products start import");
-
-  ImportBridge.startProductsImport(shopDataKey).then(job => {
-    Logger.log("products import started");
-    var jobKey = job.key;
-
-    ImportBridge.saveProducts(shopDataKey, products).then(result => {
-      Logger.log("products sent");
-
-      ImportBridge.finishProductsImport(shopDataKey, jobKey).then(job => {
-        Logger.log("products import finished");
-
-        future.resolve();
-      }).catch(future.reject);
-    }).catch(future.reject);
-  }).catch(future.reject);
-
-  return future.promise;
-}
-
-function sendCategoriesData(shopDataKey, categories) {
-  var future = deferred();
-
-  Logger.log("categories start import");
-
-  ImportBridge.startCategoriesImport(shopDataKey).then(job => {
-    Logger.log("categories import started");
-
-    var jobKey = job.key;
-
-    ImportBridge.saveCategories(shopDataKey, categories).then(result => {
-      Logger.log("categories sent");
-
-      ImportBridge.finishCategoriesImport(shopDataKey, jobKey).then(job => {
-        Logger.log("categories import finished");
-
-        future.resolve();
-      }).catch(future.reject);
-    }).catch(future.reject);
-  }).catch(future.reject);
-
-  return future.promise;
 }
 
 function sendRawData(shopDataKey) {}

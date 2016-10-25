@@ -243,7 +243,7 @@ function getProductSales(product, tile) {
   let salePrice = price.amount;
   let pricePerUnit = getPricePerUnit(tile, salePrice);
 
-  let sale = product.salesTemplate();
+  let sale = new ProductBridge.Sale();
 
   sale.price.price = salePrice;
 

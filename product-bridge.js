@@ -1,8 +1,10 @@
 "use strict";
 
-const util = require("util");
-const schema = require("js-schema");
-const validate = schema({
+const Util = require("util");
+const Schema = require("js-schema");
+const Logger = require("./log-bridge");
+
+const VALIDATE_PRODUCT = Schema({
   "shopDataKey": [Number, null],
   "identifier": String,
   "slug": String,
@@ -22,8 +24,6 @@ const validate = schema({
   "details": Object
 });
 
-var Logger = require("./log-bridge");
-
 class Product {
   constructor() {
     this.shopDataKey = null;
@@ -32,53 +32,52 @@ class Product {
     this.title = null;
     this.categoryIdentifiers = [];
     this.brand = null;
-    this.normalPrice = {
-      price: null,
-      pricePerUnit: null,
-      amount: null,
-      unit: null,
-      packaging: null,
-    };
+    this.normalPrice = new Price();
     this.amount = null;
     this.sales = []; // array of objects: see salesTemplate
     this.tags = {}; // object (e.g. "organic": "Bioprodukt", see tags-translator.js)
     this.details = {
-      //imageUrl: null,
+      //imageUrl: "",
       //eanCode: "",
-      //description: "", // string
-      //vatCode: null, // number
+      //description: "",
+      //descriptionDetail: "",
+      //vatCode: null,
       //nutrition: "",
       //ingredients: "",
       //...
-    };
+    }
   }
 
   checkFormat() {
-    var validProduct = validate(this);
+    let productValid = VALIDATE_PRODUCT(this);
 
-    if (!validProduct) {
-      let validationErrors = util.inspect(validate.errors(this));
+    if (!productValid) {
+      let validationErrors = Util.inspect(VALIDATE_PRODUCT.errors(this));
       Logger.error(`product format error: ${validationErrors}`);
     }
 
-    return validProduct;
+    return productValid;
   }
+}
 
-  salesTemplate() {
-    return {
-      price: {
-        price: null,
-        pricePerUnit: null,
-        amount: null,
-        unit: null,
-        packaging: null,
-      },
-      type: null,
-      condition: null,
-      information: null,
-      fromTimestamp: null,
-      toTimestamp: null,
-    }
+class Price {
+  constructor() {
+    this.price = null;
+    this.pricePerUnit = null;
+    this.amount = null;
+    this.unit = null;
+    this.packaging = null;
+  }
+}
+
+class Sale {
+  constructor() {
+    this.price = new Price();
+    this.type = null;
+    this.condition = null;
+    this.information = null;
+    this.fromTimestamp = null;
+    this.toTimestamp = null;
   }
 }
 
@@ -87,15 +86,15 @@ function getDataSchema(products) {
   var productSchema = {};
 
   for (let i = 0; i < products.length; i++) {
-    let schema = traverse(products[i]);
-    tilesSchemata.push(schema);
+    let singleSchema = traverse(products[i]);
+    tilesSchemata.push(singleSchema);
   }
 
   for (let i = 0; i < tilesSchemata.length; i++) {
     productSchema = Object.assign(productSchema, tilesSchemata[i]);
   }
 
-  console.log(productSchema);
+  Logger.log(productSchema);
 }
 
 function traverse(object) {
@@ -111,7 +110,7 @@ function traverse(object) {
 }
 
 function isNotEmptyObject(operand) {
-  return operand && typeof(operand) === "object" && Object.keys(operand).length;
+  return operand && typeof(operand) === "object" && !(operand instanceof Array) && Object.keys(operand).length;
 }
 
 function getTypeOf(operand) {
@@ -119,6 +118,10 @@ function getTypeOf(operand) {
 
   if (!operand && operand !== 0) {
     return null;
+  }
+
+  if (operand instanceof Array) {
+    return [];
   }
 
   if (type === "object") {
@@ -130,5 +133,7 @@ function getTypeOf(operand) {
 
 module.exports = {
   Product: Product,
+  Price: Price,
+  Sale: Sale,
   getDataSchema: getDataSchema,
 };
