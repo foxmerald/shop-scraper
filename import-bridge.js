@@ -171,15 +171,15 @@ const ImportBridge = (function() {
 
     Logger.log("categories start import");
 
-    ImportBridge.startCategoriesImport(shopDataKey).then(job => {
+    startCategoriesImport(shopDataKey).then(job => {
       Logger.log("categories import started");
 
       var jobKey = job.key;
 
-      ImportBridge.saveCategories(shopDataKey, categories).then(result => {
+      saveCategories(shopDataKey, categories).then(result => {
         Logger.log("categories sent");
 
-        ImportBridge.finishCategoriesImport(shopDataKey, jobKey).then(job => {
+        finishCategoriesImport(shopDataKey, jobKey).then(job => {
           Logger.log("categories import finished");
 
           future.resolve();
