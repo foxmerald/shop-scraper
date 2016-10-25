@@ -3,6 +3,7 @@
 const request = require("request");
 const deferred = require("deferred");
 const Logger = require("./log-bridge");
+const ServerBridge = require("./server-bridge");
 
 var serverUrl;
 if (process.env.ZUPER_PRODUCTION) {
@@ -14,80 +15,6 @@ if (process.env.ZUPER_PRODUCTION) {
 var apiKey = process.env.ZUPER_API_KEY;
 // TODO: remove
 apiKey = "G2sxb819q4J8Q5n878b4kvC7647la5Qh";
-
-const ServerBridge = (function() {
-  function pollJob(jobUrl, jobKey, future) {
-    if (!future) {
-      future = deferred();
-    }
-
-    let requestOptions = {
-      method: "GET",
-      uri: jobUrl,
-      json: true,
-      qs: {
-        jobKey: jobKey
-      }
-    };
-
-    var retryPolling = function() {
-      setTimeout(function() {
-        pollJob(jobUrl, jobKey, future);
-      }, 500);
-    };
-
-    var promise = authenticateRequest(requestOptions);
-    promise.then(function(body) {
-      var job = body;
-
-      if (job.closedTimestamp) {
-        future.resolve(body);
-      } else {
-        retryPolling();
-      }
-    }).catch(retryPolling);
-
-    return future.promise;
-  }
-
-  function requestJob(requestOptions, jobUrl) {
-    var future = deferred();
-
-    var promise = authenticateRequest(requestOptions);
-    promise.then(function(body) {
-      var job = body;
-
-      var jobPromise = pollJob(jobUrl, job.key);
-      future.resolve(jobPromise);
-    }).catch(future.reject);
-
-    return future.promise;
-  }
-
-  function authenticateRequest(requestOptions) {
-    var future = deferred();
-
-    requestOptions.headers = requestOptions.headers || {};
-    requestOptions.headers["x-zuper-api-key"] = apiKey;
-
-    request(requestOptions, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        future.resolve(body);
-      } else {
-        future.reject(error);
-      }
-    });
-
-    return future.promise;
-  }
-
-  var bridge = {};
-  bridge.pollJob = pollJob;
-  bridge.requestJob = requestJob;
-  bridge.authenticateRequest = authenticateRequest;
-
-  return bridge;
-})();
 
 const ImportBridge = (function() {
   function startImport(url, shopDataKey) {
@@ -208,8 +135,8 @@ const ImportBridge = (function() {
 
     Promise.all(productsPromises).then(result => {
       future.resolve(result);
-    }).catch(e => {
-      Logger.error(e);
+    }).catch(error => {
+      Logger.error(error);
       future.reject();
     })
 
@@ -222,21 +149,67 @@ const ImportBridge = (function() {
     return finishImport(url, shopDataKey, jobKey);
   }
 
+  function sendProductsData(shopDataKey, products) {
+    var future = deferred();
+
+    Logger.log("products start import");
+
+    startProductsImport(shopDataKey).then(job => {
+      Logger.log("products import started");
+      var jobKey = job.key;
+
+      saveProducts(shopDataKey, products).then(result => {
+        Logger.log("products sent");
+
+        finishProductsImport(shopDataKey, jobKey).then(job => {
+          Logger.log("products import finished");
+
+          future.resolve();
+        }).catch(future.reject);
+      }).catch(future.reject);
+    }).catch(future.reject);
+
+    return future.promise;
+  }
+
+  function sendCategoriesData(shopDataKey, categories) {
+    var future = deferred();
+
+    Logger.log("categories start import");
+
+    startCategoriesImport(shopDataKey).then(job => {
+      Logger.log("categories import started");
+
+      var jobKey = job.key;
+
+      saveCategories(shopDataKey, categories).then(result => {
+        Logger.log("categories sent");
+
+        finishCategoriesImport(shopDataKey, jobKey).then(job => {
+          Logger.log("categories import finished");
+
+          future.resolve();
+        }).catch(future.reject);
+      }).catch(future.reject);
+    }).catch(future.reject);
+
+    return future.promise;
+  }
+
   function saveRawData(shopDataKey) {}
 
   var bridge = {};
-  bridge.startCategoriesImport = startCategoriesImport;
-  bridge.saveCategories = saveCategories;
-  bridge.finishCategoriesImport = finishCategoriesImport;
-  bridge.startProductsImport = startProductsImport;
-  bridge.saveProducts = saveProducts;
-  bridge.finishProductsImport = finishProductsImport;
+  // bridge.startCategoriesImport = startCategoriesImport;
+  // bridge.saveCategories = saveCategories;
+  // bridge.finishCategoriesImport = finishCategoriesImport;
+  // bridge.startProductsImport = startProductsImport;
+  // bridge.saveProducts = saveProducts;
+  // bridge.finishProductsImport = finishProductsImport;
   bridge.saveRawData = saveRawData;
+  bridge.sendProductsData = sendProductsData;
+  bridge.sendCategoriesData = sendCategoriesData;
 
   return bridge;
 })();
 
-module.exports = {
-  ImportBridge: ImportBridge,
-  ServerBridge: ServerBridge,
-}
+module.exports = ImportBridge;
