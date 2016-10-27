@@ -131,9 +131,14 @@ function getTypeOf(operand) {
   return type;
 }
 
+function validateRawProduct(price) {
+  return !!price;
+}
+
 module.exports = {
   Product: Product,
   Price: Price,
   Sale: Sale,
   getDataSchema: getDataSchema,
+  validateRawProduct: validateRawProduct,
 };

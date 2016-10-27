@@ -91,8 +91,13 @@ function preprocessProducts(productsData, categories) {
 
   for (let i = 0; i < tiles.length; i++) {
     let tile = tiles[i];
-    let product = preprocessProduct(tile, categories);
 
+    let isValidRawProduct = ProductBridge.validateRawProduct(tile.data.price.final);
+    if (!isValidRawProduct) {
+      continue;
+    }
+
+    let product = preprocessProduct(tile, categories);
     products.push(product);
   }
 
