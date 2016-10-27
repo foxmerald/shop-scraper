@@ -7,11 +7,13 @@ const TestDataBridge = require("./bridges/test-data-bridge");
 
 const SHOP_DATA_KEYS = {
   billa: 1,
-  merkur: 2
+  merkur: 2,
+  spar: 3,
 }
 
 fetchAndSendData("billa");
 fetchAndSendData("merkur");
+fetchAndSendData("spar");
 
 function fetchAndSendData(shopName) {
   Logger.log(`start fetching ${shopName} data`);

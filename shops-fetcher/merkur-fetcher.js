@@ -22,7 +22,7 @@ function fetchData() {
     future.resolve(testData);
   }).catch(error => {
     if (error.code === "ENOENT") {
-      Logger.log("No Test-Data-File found. Fetching new data.");
+      Logger.log("No Merkur Test-Data-File found. Fetching new data.");
 
       let newDataPromise = fetchNewData();
       newDataPromise.then(data => {
