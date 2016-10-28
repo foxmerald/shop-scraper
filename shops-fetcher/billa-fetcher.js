@@ -21,7 +21,7 @@ function fetchData() {
     future.resolve(preprocessedData);
   }).catch(error => {
     if (error.code === "ENOENT") {
-      Logger.log("No Test-Data-File found. Fetching new data.");
+      Logger.log("No Billa Test-Data-File found. Fetching new data.");
 
       let newDataPromise = fetchNewData();
 
