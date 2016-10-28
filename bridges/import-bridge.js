@@ -6,7 +6,8 @@ const Logger = require("./log-bridge");
 const ServerBridge = require("./server-bridge");
 
 var serverUrl;
-if (process.env.ZUPER_PRODUCTION) {
+var PRODUCTION = !!process.env.ZUPER_PRODUCTION;
+if (PRODUCTION) {
   serverUrl = "https://zuper-preise-backend.appspot.com";
 } else {
   serverUrl = "http://localhost:7000";
@@ -192,6 +193,11 @@ const ImportBridge = (function() {
 
   function saveRawData(shopDataKey, data) {
     let future = deferred();
+    if (!PRODUCTION) {
+      future.resolve();
+
+      return;
+    }
 
     let requestUrl = serverUrl + "/import/raw";
 
