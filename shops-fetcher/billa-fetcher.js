@@ -1,6 +1,6 @@
 "use strict";
 
-const SHOP_DATA_KEY = 1;
+const SHOP_DATA_KEY = 2;
 
 const Request = require("request");
 const Deferred = require("deferred");
