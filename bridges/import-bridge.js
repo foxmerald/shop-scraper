@@ -196,7 +196,7 @@ const ImportBridge = (function() {
     if (!PRODUCTION) {
       future.resolve();
 
-      return;
+      return future.promise;
     }
 
     let requestUrl = serverUrl + "/import/raw";
