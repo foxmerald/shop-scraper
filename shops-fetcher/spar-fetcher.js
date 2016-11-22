@@ -1,5 +1,3 @@
-"use strict";
-
 const SHOP_DATA_KEY = 3;
 
 const Request = require("request");
@@ -18,50 +16,278 @@ function fetchData() {
   var testDataPromise = TestDataBridge.loadFile(SHOP_DATA_KEY);
 
   testDataPromise.then((data) => {
-    let testData = preprocessTestData(data);
-
-    future.resolve(testData);
+    future.resolve(preprocessData(data.categories, data.products));
   }).catch(error => {
     if (error.code === "ENOENT") {
       Logger.log("No Spar Test-Data-File found. Fetching new data.");
 
-      let newDataPromise = fetchNewData();
-      newDataPromise.then(future.resolve)
+      fetchNewData()
+        .then(future.resolve)
         .catch(future.reject);
     } else {
-      Logger.error(`Error: ${error}`);
-      future.reject(error);
+      rejectAndLogError(future);
     }
   });
 
   return future.promise;
 }
 
-function fetchNewData() {
-  let categoriesPromise = fetchCategories();
+function preprocessData(rawCategoriesData, rawProductsData) {
+  let categories = getCategoriesData(rawCategoriesData);
+
+  let rawProducts = preprocessRawProducts(rawProductsData);
+  let products = preprocessProducts(rawProducts);
+
+  return {
+    categories: categories,
+    products: products
+  }
 }
 
-function fetchCategories() {
-  const CATEGORY_LEVELS = 3;
+function fetchNewData() {
+  let future = Deferred();
+  let rawCategoriesDataPromise = fetchSparFrontPage();
+
+  rawCategoriesDataPromise.then(rawCategoriesData => {
+    let categories = getCategoriesData(rawCategoriesData);
+    let urls = getUrls(categories);
+    let rawProductsDataPromise = fetchRawProductsData(urls);
+
+    rawProductsDataPromise.then(rawProductsData => {
+      TestDataBridge.saveTestData(SHOP_DATA_KEY, rawCategoriesData, rawProductsData);
+      future.resolve(preprocessData(rawCategoriesData, rawProductsData))
+    }).catch(rejectAndLogError(future));
+  }).catch(rejectAndLogError(future));
+}
+
+function preprocessRawProducts(result) {
+  let products = {};
+
+  for (let i = 0; i < result.length; i++) {
+    let resultStack = result[i];
+    let productsList = resultStack.products;
+
+    for (let j = 0; j < productsList.length; j++) {
+      let product = productsList[j];
+      let id = product.code;
+
+      if (!products[id]) {
+        product.categoryStrings = [resultStack.category];
+        products[id] = product;
+      }
+
+      products[id].categoryStrings.push(product["product-categories"]);
+    }
+  }
+
+  return products;
+}
+
+function preprocessProducts(rawProducts) {
+  let products = [];
+
+  for (let id in rawProducts) {
+    let product = preprocessProduct(rawProducts[id]);
+    products.push(product);
+  }
+
+  return products;
+}
+
+function preprocessProduct(data) {
+  let product = new ProductBridge.Product();
+
+  product.identifier = data.code;
+  product.categoryIdentifiers = getProductCategories(data);
+
+  product.tags = getProductTags(data);
+  product.details.imageUrl = data["product-image"];
+
+  product.brand = data["title"];
+  product.title = data["product-short-description-2"];
+  product.amount = data["product-short-description-3"];
+  product.details.description = data["product-long-description"];
+
+  product.sales = getProductSales(data);
+
+  //TODO calculate price & price per unit
+  /*
+  product.normalPrice.price = "";
+  product.normalPrice.pricePerUnit = "";
+  product.normalPrice.amount = "";
+  product.normalPrice.unit = "";
+  product.normalPrice.packaging = "";
+
+  product.checkFormat(product);
+  */
+
+  return product;
+}
+
+function getProductSales(data) {
+  //TODO
+  /*
+  product-promo-bestprice
+  product-promo-bestname
+  product-sales-per-unit
+  product-is-on-promotion
+  product-promo-names
+  */
+}
+
+function getProductCategories(data) {
+  let categories = [];
+  let categoryStrings = data.categoryStrings;
+
+  for (let i = 0; i < categoryStrings.length; i++) {
+    let categoriesList = categoryStrings[i].split(/:|\|/);
+
+    for (let j = 0; j < categoriesList.length; j++) {
+      let categoryId = categoriesList[j].split("_")[0];
+      let isValidCategoryFormat = validateCategoryFormat(categoryId);
+
+      if (!categoryId || !isValidCategoryFormat || categories.includes(categoryId)) {
+        continue;
+      }
+
+      categories.push(categoryId);
+    }
+  }
+
+  return categories;
+}
+
+function validateCategoryFormat(categoryId) {
+  let validCategoryFormat = /^F(([0-9]+(-[0-9])*))+$/;
+  return validCategoryFormat.test(categoryId);
+}
+
+function getProductTags(data) {
+  //tags:
+  //data["product-is-new"]
+  //data["product-is-on-promotion"]
+}
+
+function fetchRawProductsData(urls, results = [], pageNr = 1) {
+  if (!urls.length || results.length >= 5) {
+    return results;
+  }
 
   let future = Deferred();
-  let frontPageHtmlPromise = fetchSparFrontPage();
+  let categoryUrl = urls[0];
+  let nowTimestamp = Moment().unix() * 1000;
+  let url = `${categoryUrl}&_=${nowTimestamp}&page=${pageNr}`;
 
-  frontPageHtmlPromise.then(body => {
-    let categories = {};
-    let $ = Cheerio.load(body);
+  let options = {
+    url: url,
+  };
 
-    for (let levelNr = 1; levelNr <= CATEGORY_LEVELS; levelNr++) {
-      let categoryWrappers = $(`.level${levelNr}`);
-      preprocessCategories($, categories, categoryWrappers);
+  Request(options, (error, response, body) => {
+    if (!error && response.statusCode === 200) {
+      let rawData = preprocessBody(body);
+      results.push(rawData);
+
+      logProgress(url, rawData);
+
+      if (rawData.pageCurrent < rawData.pageTotal) {
+        future.resolve(fetchRawProductsData(urls, results, pageNr + 1));
+        return;
+      }
+    } else {
+      Logger.error(`Error - ${url}: ${error}`);
     }
 
-    debugger;
-
-    future.resolve(categories);
-  }).catch(future.reject);
+    urls.shift();
+    future.resolve(fetchRawProductsData(urls, results));
+  });
 
   return future.promise;
+}
+
+function logProgress(url, rawData) {
+  Logger.log(`Success: ${url} (Page ${rawData.pageCurrent}/${rawData.pageTotal}, ${rawData.products.length} products)`);
+}
+
+function preprocessBody(body) {
+  const STRINGS = {
+    results: "\"results\" :",
+    searchSuggestions: ",\"searchSuggestions\"",
+    category: "\"queryCategory\" :",
+    links: ",\n\"links\"",
+    resultCount: "\"resultcount\" :",
+    priceRange: ",\n\"price_range\"",
+    currentPage: "\"current-page\" :",
+    next: ",\n\"next\"",
+    pageTotal: "\"page-total\":",
+    pages: ",\n\"pages\"",
+  };
+
+  let productsString = getStringBetween(body, STRINGS.results, STRINGS.searchSuggestions);
+  let categoryString = getStringBetween(body, STRINGS.category, STRINGS.links);
+  let resultCount = getStringBetween(body, STRINGS.resultCount, STRINGS.priceRange);
+  let pageCurrentString = getStringBetween(body, STRINGS.currentPage, STRINGS.next);
+  let pageTotalString = getStringBetween(body, STRINGS.pageTotal, STRINGS.pages);
+
+  let category = removeQuotes(categoryString);
+  let pageCurrent = removeQuotes(pageCurrentString);
+  let pageTotal = removeQuotes(pageTotalString);
+
+  let rawProductsData = {
+    products: JSON.parse(productsString),
+    category: category,
+    resultCount: JSON.parse(resultCount),
+    pageCurrent: parseInt(pageCurrent),
+    pageTotal: parseInt(pageTotal),
+  }
+
+  return rawProductsData;
+}
+
+function getStringBetween(string, start, end) {
+  if (!start || !end) {
+    return null;
+  }
+
+  return string.substring(string.indexOf(start) + start.length, string.indexOf(end));
+}
+
+function removeQuotes(string) {
+  let firstQuote = string.indexOf("\"") + 1;
+  let lastQuote = string.lastIndexOf("\"");
+
+  return string.substring(firstQuote, lastQuote);
+}
+
+function getUrls(categories) {
+  let urls = [];
+
+  for (let cat in categories) {
+
+    if (cat.includes("-")) {
+      continue;
+    }
+
+    let categoryId = categories[cat].identifier;
+    let url = `https://sp1004e38b.guided.lon5.atomz.com/?callback=parseResponse&sp_cs=UTF-8&category=${categoryId}`;
+
+    urls.push(url);
+  }
+
+  return urls;
+}
+
+function getCategoriesData(body) {
+  const CATEGORY_LEVELS = 3;
+
+  let categories = {};
+  let $ = Cheerio.load(body);
+
+  for (let levelNr = 1; levelNr <= CATEGORY_LEVELS; levelNr++) {
+    let categoryWrappers = $(`.level${levelNr}`);
+    preprocessCategories($, categories, categoryWrappers);
+  }
+
+  return categories;
 }
 
 function preprocessCategories($, categories = {}, categoryWrappers) {
@@ -101,6 +327,8 @@ function getSlugFromUrl(url) {
 }
 
 function fetchSparFrontPage() {
+  Logger.log("Spar: Start fetching Front Page Html");
+
   let future = Deferred();
   let options = {
     url: "https://www.interspar.at/shop/lebensmittel/",
@@ -110,29 +338,21 @@ function fetchSparFrontPage() {
     if (!error && response.statusCode === 200) {
       future.resolve(body);
     } else {
-      Logger.error("Couldn't load Spar Front Page");
-      future.reject(error);
+      rejectAndLogError(future);
     }
   });
 
   return future.promise;
 }
 
+function rejectAndLogError(future) {
+  return function(error) {
+    Logger.error(`Error: ${error}`);
+    Logger.error(`Error: ${error.stack}`); // TODO remove
+    future.reject(error);
+  };
+}
+
 module.exports = {
   fetchData: fetchData,
 };
-
-// fetch topcategories
-// F1 bis F12
-// https://sp1004e38b.guided.lon5.atomz.com/?callback=parseResponse&sp_cs=UTF-8&category=F2&callback=parseResponse&_=1476975014238
-// https://sp1004e38b.guided.lon5.atomz.com/?callback=parseResponse&sp_cs=UTF-8&category=${currentCategory}&page=${currentPage}&callback=parseResponse&_=${currentTimestamp}
-
-// go trough all pages
-
-// save productIds to Array
-
-// crawl product detail pages:
-
-// Product Detail Page
-// `https://www.interspar.at/shop/lebensmittel/p/${productId}`
-// e.g. https://www.interspar.at/shop/lebensmittel/p/5023660
