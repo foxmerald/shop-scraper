@@ -13,7 +13,7 @@ const SHOP_DATA_KEYS = {
 
 fetchAndSendData("billa");
 fetchAndSendData("merkur");
-fetchAndSendData("spar");
+//fetchAndSendData("spar");
 
 function fetchAndSendData(shopName) {
   Logger.log(`start fetching ${shopName} data`);
