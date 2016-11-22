@@ -6,14 +6,14 @@ const Logger = require("./bridges/log-bridge");
 const TestDataBridge = require("./bridges/test-data-bridge");
 
 const SHOP_DATA_KEYS = {
-  billa: 1,
-  merkur: 2,
-  spar: 3,
+  billa: 2,
+  merkur: 3,
+  spar: 4,
 }
 
 fetchAndSendData("billa");
 fetchAndSendData("merkur");
-fetchAndSendData("spar");
+//fetchAndSendData("spar");
 
 function fetchAndSendData(shopName) {
   Logger.log(`start fetching ${shopName} data`);
