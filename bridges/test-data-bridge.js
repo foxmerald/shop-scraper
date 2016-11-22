@@ -24,7 +24,7 @@ function loadFile(shopKey) {
       let dataJSON = JSON.parse(data);
       future.resolve(dataJSON);
     } else {
-      Logger.log(error);
+      Logger.error(error);
       future.reject(error);
     }
   });
@@ -32,7 +32,15 @@ function loadFile(shopKey) {
   return future.promise;
 }
 
+function saveTestData(shopDataKey, categories, products) {
+  saveFile(shopDataKey, {
+    categories: categories,
+    products: products
+  });
+}
+
 module.exports = {
   saveFile: saveFile,
   loadFile: loadFile,
+  saveTestData: saveTestData,
 };

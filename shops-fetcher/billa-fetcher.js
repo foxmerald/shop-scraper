@@ -49,21 +49,12 @@ function fetchNewData() {
   Promise.all([categoriesPromise, productPromise]).then(([categories, products]) => {
     let preprocessedData = preprocessData(categories, products);
 
-    saveTestData(categories, products);
+    TestDataBridge.saveTestData(SHOP_DATA_KEY, categories, products);
 
     future.resolve(preprocessedData);
   }).catch(future.reject);
 
   return future.promise;
-}
-
-function saveTestData(categories, products) {
-  let rawData = {
-    categories: categories,
-    products: products,
-  };
-
-  TestDataBridge.saveFile(SHOP_DATA_KEY, rawData);
 }
 
 function preprocessData(categoriesData, productsData) {
