@@ -1,3 +1,4 @@
+// Author: TomTasche
 "use strict";
 
 const request = require("request");
